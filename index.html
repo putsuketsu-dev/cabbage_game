@@ -268,7 +268,11 @@
         def2: BASE_URL + 'd2.png',
         def3: BASE_URL + 'd3.png',
         def4: BASE_URL + 'd4.png',
-        def5: BASE_URL + 'd5.png'
+        def5: BASE_URL + 'd5.png',
+        // === 新增圖片載入 (大絕動畫) ===
+        playerUltAttack1: BASE_URL + 'ba1.png',
+        playerUltAttack2: BASE_URL + 'ba2.png'
+        // ============================
     };
 
     const images = {};
@@ -335,7 +339,10 @@
         isInvincible: false, invincibleTimer: 0, isAttacking: false, attackTimer: 0,
         isDefending: false, defenseTimer: 0, charge: 0, maxCharge: 20,
         isStunned: false, stunTimer: 0,
-        defenseDuration: 0, guardHitCount: 0 
+        defenseDuration: 0, guardHitCount: 0,
+        // === 主角大絕攻擊狀態 ===
+        isUltAttacking: false, ultAttackTimer: 0
+        // ============================
     };
 
     const PLAYER_MIN_Y = 200; 
@@ -419,7 +426,7 @@
     }
 
     function handleFireRelease() {
-        if (player.isStunned || !gameRunning) {
+        if (player.isStunned || !gameRunning || player.isUltAttacking) {
             player.isDefending = false;
             fireKeyTimer = 0;
             player.guardHitCount = 0; 
@@ -461,6 +468,11 @@
         updateChargeUI(); 
         showSkillText("小高麗的制裁！", player.x, player.y - 50);
         
+        // === 啟用主角大絕攻擊狀態 (動畫持續 30 幀) ===
+        player.isUltAttacking = true;
+        player.ultAttackTimer = 30; 
+        // ===========================================
+
         bullets.push({
             x: player.x + player.width, 
             y: player.y + player.height / 2 - 75, 
@@ -491,7 +503,8 @@
     }
 
     function shoot() {
-        if(player.isDefending) return; 
+        // 確保大絕招動畫播放時無法普攻
+        if(player.isDefending || player.isUltAttacking) return; 
 
         let bulletCount = 1;
         if (level === 2) bulletCount = 3;
@@ -624,9 +637,7 @@
                     enemyType = 'smallBoss'; 
                     eWidth = 130 * SIZE_MULTIPLIER; 
                     eHeight = 130 * SIZE_MULTIPLIER; 
-                    // === 調整 1: 增加小王 HP (8 -> 12) ===
                     eHp = 12; 
-                    // ======================================
                 }
             }
             
@@ -690,6 +701,16 @@
 
     function update() {
         if (gameRunning) {
+            
+            // === 處理大絕招動畫計時器 ===
+            if (player.isUltAttacking) {
+                player.ultAttackTimer--;
+                if (player.ultAttackTimer <= 0) {
+                    player.isUltAttacking = false;
+                }
+            }
+            // ===========================
+
             if (player.isDefending) {
                 player.defenseDuration++;
             } else { 
@@ -839,10 +860,8 @@
                 } else { 
                     if (e.type === 'smallBoss') {
                         e.jumpTimer = (e.jumpTimer || 0) + 1;
-                        // === 調整 2: 延長緩慢接近時間 (40 -> 60) ===
                         if (e.jumpTimer < 60) { 
                             e.x -= 0.5;
-                        // === 調整 2: 調整衝刺階段時間 (40-60 -> 60-80) ===
                         } else if (e.jumpTimer < 80) { 
                             e.x -= e.speed * 3; 
                             if (e.jumpTimer === 60) { // 在進入衝刺時重設跳躍
@@ -985,6 +1004,9 @@
         document.getElementById('endTitle').innerText = "遊戲結束";
         finalScoreEl.innerText = score;
         let p = document.createElement('p'); p.innerText = reason; p.style.color='red';
+        // 移除舊的失敗原因，避免重複添加
+        const oldReason = gameOverScreen.querySelector('p[style*="color: red"]');
+        if (oldReason) oldReason.remove(); 
         gameOverScreen.insertBefore(p, gameOverScreen.children[2]);
         gameOverScreen.style.display = 'block';
     }
@@ -1018,13 +1040,19 @@
             let isMoving = keys['ArrowUp'] || keys['ArrowDown'] || keys['ArrowLeft'] || keys['ArrowRight'];
             let bodyImgKey;
 
-            if (player.isAttacking) {
+            // === 繪製主角圖片邏輯更新 ===
+            if (player.isUltAttacking) {
+                // 大絕招動畫 (每 5 幀切換一次)
+                bodyImgKey = (Math.floor(frameCount / 5) % 2 === 0) ? 'playerUltAttack1' : 'playerUltAttack2';
+            } else if (player.isAttacking) {
                 bodyImgKey = 'playerAttack';
             } else if (isMoving || isTransitioning) {
                 bodyImgKey = (Math.floor(frameCount / 8) % 2 === 0) ? 'playerRun1' : 'playerRun2';
             } else {
                 bodyImgKey = 'playerRun1';
             }
+            // ===========================
+
             drawSprite(bodyImgKey, player.x, player.y, player.width, player.height, '#32CD32'); 
 
             if (player.isDefending) {
