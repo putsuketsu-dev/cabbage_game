@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>小高麗：戰鬥完全進化版</title>
     <style>
+        /* (Style unchanged) */
         body {
             margin: 0;
             padding: 0;
@@ -417,10 +418,13 @@
         }
     }
 
+    // === 修正 1: 在防禦鍵釋放時，強制重置防禦計數 ===
     function handleFireRelease() {
         if (player.isStunned || !gameRunning) {
             player.isDefending = false;
             fireKeyTimer = 0;
+            // 暈眩狀態下釋放，仍然重置計數，以防意外
+            player.guardHitCount = 0; 
             return;
         }
 
@@ -430,9 +434,14 @@
             player.isAttacking = true;
             player.attackTimer = 15;
         }
+        
         player.isDefending = false;
         fireKeyTimer = 0;
+        
+        // **核心修正:** 玩家主動放開防禦鍵時，重置格擋計數。
+        player.guardHitCount = 0; 
     }
+    // =========================================================
 
     function addCharge(amount = 1) {
         if (player.charge < player.maxCharge) {
@@ -514,19 +523,23 @@
         }
     }
 
-    function playerTakeDamage(damage) {
+    function playerTakeDamage(damage, options = {}) {
         if (player.isDefending) {
-            player.guardHitCount++;
+            
+            let hitCount = options.isUltimate ? 3 : 1; 
+            
+            player.guardHitCount += hitCount;
+            
             if (player.guardHitCount >= 5) { // Defense Break Trigger (破防)
                 player.isDefending = false;
                 player.isStunned = true;
                 player.stunTimer = 60; // Stun duration
                 player.hp -= 1; 
-                player.guardHitCount = 0; // Reset guardHitCount
+                player.guardHitCount = 0; // Reset guardHitCount on break
                 updateHPUI();
                 showCombatText("破防!!", player.x + player.width/2, player.y - 20, "red");
             } else {
-                showCombatText("防禦", player.x + player.width/2, player.y, "#00BFFF");
+                showCombatText(`防禦 x${hitCount}`, player.x + player.width/2, player.y, "#00BFFF");
             }
             return; 
         }
@@ -681,9 +694,11 @@
         if (gameRunning) {
             if (player.isDefending) {
                 player.defenseDuration++;
-            } else {
+            } else { 
+                // === 修正 2: 移除非防禦狀態下的計數重置 (改由 handleFireRelease 負責) ===
                 player.defenseDuration = 0;
-                player.guardHitCount = 0; 
+                // player.guardHitCount = 0; <--- 已移除，防止與 handleFireRelease 邏輯衝突
+                // =====================================================================
             }
 
             if (player.isStunned) {
@@ -692,12 +707,11 @@
                 player.isAttacking = false; 
                 if (player.stunTimer <= 0) { // 暈眩 END
                     player.isStunned = false;
-                    // === 修正：強制重置防禦/攻擊按鈕狀態 (破防重置機制) ===
+                    // 修正：強制重置防禦/攻擊按鈕狀態 (破防重置機制)
                     fireKeyTimer = 0;
                     fireKeyPressed = false;
-                    keys['Space'] = false; // 鍵盤狀態重置
-                    document.getElementById('btn-fire').classList.remove('pressed'); // 觸控按鈕視覺重置
-                    // ===============================================
+                    keys['Space'] = false; 
+                    document.getElementById('btn-fire').classList.remove('pressed'); 
                 }
             } else {
                 if (fireKeyPressed) {
@@ -784,7 +798,7 @@
                     if (b.life <= 0 || b.x > canvas.width) bullets.splice(i, 1);
                 }
             }
-
+            
             for (let i = bossBullets.length - 1; i >= 0; i--) {
                 let b = bossBullets[i];
                 b.x += b.vx; b.y += b.vy;
@@ -797,21 +811,22 @@
                     }
                 }
                 let hitBoxSize = b.type === 'ultimate' ? b.size * 0.7 : b.size * 0.8; 
-                if (checkRectCollision(
-                    {x: b.x - hitBoxSize/2, y: b.y - hitBoxSize/2, width: hitBoxSize, height: hitBoxSize},
-                    {x: player.x + 10, y: player.y + 10, width: player.width - 20, height: player.height - 20}
-                )) {
-                    playerTakeDamage(1);
+                let playerHitbox = {x: player.x + 10, y: player.y + 10, width: player.width - 20, height: player.height - 20};
+                let bulletHitbox = {x: b.x - hitBoxSize/2, y: b.y - hitBoxSize/2, width: hitBoxSize, height: hitBoxSize};
+
+                if (checkRectCollision(bulletHitbox, playerHitbox)) {
                     
-                    if (b.type === 'ultimate') {
-                        player.isStunned = true;
-                        player.stunTimer = 30; 
-                        showCombatText("暈眩!", player.x, player.y - 50, "yellow");
-                    } else {
-                        bossBullets.splice(i, 1);
-                    }
+                    let isUltimateHit = b.type === 'ultimate';
+
+                    playerTakeDamage(1, {isUltimate: isUltimateHit}); 
+                    
+                    bossBullets.splice(i, 1); 
+                    i--; 
+
+                } else if (b.x < -200 || b.y < -100 || b.y > canvas.height + 100) {
+                    bossBullets.splice(i, 1);
+                    i--; 
                 }
-                if (b.x < -200 || b.y < -100 || b.y > canvas.height + 100) bossBullets.splice(i, 1);
             }
 
             let uiDirty = false;
