@@ -14,7 +14,6 @@
             align-items: center;
             height: 100vh;
             font-family: 'Microsoft JhengHei', sans-serif;
-            /* 允許捲動 */
             overflow: auto; 
             touch-action: auto; 
             user-select: none; 
@@ -92,11 +91,13 @@
             box-sizing: border-box;
             z-index: 20;
         }
+        
+        /* === 修正：方向鍵縮小 40% === */
         .control-group {
             pointer-events: auto; 
             position: relative;
-            width: 150px;
-            height: 150px;
+            width: 90px; /* 原 150px */
+            height: 90px; /* 原 150px */
         }
         .btn {
             background: rgba(255, 255, 255, 0.3);
@@ -106,16 +107,19 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            font-size: 24px;
+            font-size: 14px; /* 字體縮小 */
             color: white;
             touch-action: manipulation;
+            width: 30px; /* 原 50px */
+            height: 30px; /* 原 50px */
         }
         .btn:active, .btn.pressed { background: rgba(255, 215, 0, 0.6); }
         
-        #btn-up { top: 0; left: 50px; width: 50px; height: 50px; }
-        #btn-down { bottom: 20px; left: 50px; width: 50px; height: 50px; }
-        #btn-left { top: 50px; left: 0; width: 50px; height: 50px; }
-        #btn-right { top: 50px; right: 0; width: 50px; height: 50px; }
+        /* 重新定位按鈕 */
+        #btn-up { top: 0; left: 30px; }
+        #btn-down { bottom: 0; left: 30px; }
+        #btn-left { top: 30px; left: 0; }
+        #btn-right { top: 30px; right: 0; }
 
         #btn-fire {
             bottom: 30px; right: 10px; width: 63px; height: 63px;
@@ -312,8 +316,12 @@
     const player = {
         x: 50, y: 250, width: 160, height: 160, speed: 6, hp: 5, maxHp: 5,
         isInvincible: false, invincibleTimer: 0, isAttacking: false, attackTimer: 0,
-        isDefending: false, defenseTimer: 0, charge: 0, maxCharge: 10,
-        isStunned: false, stunTimer: 0 // 新增：暈眩狀態
+        // 修正: 集氣上限改為 20
+        isDefending: false, defenseTimer: 0, charge: 0, maxCharge: 20,
+        isStunned: false, stunTimer: 0,
+        // 新增: 防禦動畫與破防相關參數
+        defenseDuration: 0, 
+        guardHitCount: 0 
     };
 
     const PLAYER_MIN_Y = 200; 
@@ -385,7 +393,6 @@
     });
 
     function handleFirePress() {
-        // 暈眩狀態無法攻擊
         if (player.isStunned) return;
 
         fireKeyTimer = 0;
@@ -398,7 +405,6 @@
     }
 
     function handleFireRelease() {
-        // 暈眩狀態無法攻擊/結束防禦
         if (player.isStunned) {
             player.isDefending = false;
             fireKeyTimer = 0;
@@ -497,8 +503,21 @@
 
     function playerTakeDamage(damage) {
         if (player.isDefending) {
-            player.isInvincible = true;
-            player.invincibleTimer = 10; 
+            // 修正: 破防機制
+            player.guardHitCount++;
+            if (player.guardHitCount >= 5) {
+                // 破防觸發
+                player.isDefending = false;
+                player.isStunned = true;
+                player.stunTimer = 60; // 暈眩 1 秒
+                player.hp -= 1; // 破防扣血
+                player.guardHitCount = 0;
+                updateHPUI();
+                showCombatText("破防!!", player.x + player.width/2, player.y - 20, "red");
+            } else {
+                // 防禦成功特效
+                showCombatText("防禦", player.x + player.width/2, player.y, "#00BFFF");
+            }
             return; 
         }
 
@@ -596,14 +615,16 @@
 
             let spawnY = ENEMY_SPAWN_MIN_Y + Math.random() * yRange;
             
-            // 修正：小怪移動速度加倍 (* 2)
             let baseSpeed = (enemyType === 'smallBoss' ? 2 : 3 + (level * 0.8)) * 2;
 
             enemies.push({
                 x: 800, y: spawnY, 
                 width: eWidth, height: eHeight,
                 speed: baseSpeed,
-                hp: eHp, type: enemyType, maxHp: eHp
+                hp: eHp, type: enemyType, maxHp: eHp,
+                // 小王特殊屬性
+                jumpTimer: 0,
+                vy: 0
             });
         }
     }
@@ -645,16 +666,22 @@
     function update() {
         if (!gameRunning) return;
 
-        // 處理暈眩
+        // 防禦計時器累加，用於動畫
+        if (player.isDefending) {
+            player.defenseDuration++;
+        } else {
+            player.defenseDuration = 0;
+            player.guardHitCount = 0; // 解除防禦時重置被打次數
+        }
+
         if (player.isStunned) {
             player.stunTimer--;
-            player.isDefending = false; // 暈眩時無法防禦
-            player.isAttacking = false; // 暈眩時無法攻擊
+            player.isDefending = false; 
+            player.isAttacking = false; 
             if (player.stunTimer <= 0) {
                 player.isStunned = false;
             }
         } else {
-            // 正常按鍵處理 (只在未暈眩時)
             if (fireKeyPressed) {
                 fireKeyTimer++;
                 if (fireKeyTimer >= 15) { 
@@ -674,7 +701,6 @@
             if (keys['ArrowRight'] && player.x < canvas.width - player.width) player.x += player.speed;
         }
 
-        // 背景移動邏輯
         if (bossActive && !bossSpawned) {
             if (backgroundOffsetX > targetBackgroundOffsetX) {
                 backgroundOffsetX -= backgroundScrollSpeed;
@@ -686,7 +712,6 @@
             backgroundOffsetX = 0;
         }
 
-        // 垂直範圍限制
         player.y = Math.min(Math.max(player.y, PLAYER_MIN_Y), PLAYER_MAX_Y);
         player.x = Math.min(Math.max(player.x, 0), canvas.width - player.width);
 
@@ -698,12 +723,10 @@
         if (bossText.timer > 0) bossText.timer--;
         if (pendingLevelUp) { performLevelUp(); pendingLevelUp = false; }
         if (!bossActive && !pendingLevelUp) {
-            // 修正：小怪數量增加 1.5 倍 (Spawn Rate / 1.5)
             enemySpawnRate = Math.max(5, (BASE_SPAWN_RATE - (level * RATE_DECREMENT)) / 1.5); 
             if (frameCount % Math.floor(enemySpawnRate) === 0) spawnEnemy();
         }
 
-        // 道具更新
         for (let i = items.length - 1; i >= 0; i--) {
             let item = items[i];
             item.x -= item.speed; 
@@ -711,7 +734,6 @@
                 if (item.type === 'heart') {
                     if(player.hp < player.maxHp) { player.hp++; updateHPUI(); }
                 } else if (item.type === 'blackHeart') {
-                    // 黑色愛心陷阱
                     player.hp -= 2;
                     updateHPUI();
                     showCombatText("-2", player.x, player.y, "black");
@@ -722,14 +744,12 @@
             if (item.x < -50) items.splice(i, 1);
         }
 
-        // 戰鬥文字更新
         for(let i = combatTexts.length - 1; i >= 0; i--) {
             let t = combatTexts[i];
             t.y -= 1; t.life--;
             if(t.life <= 0) combatTexts.splice(i, 1);
         }
 
-        // 子彈移動
         for (let i = bullets.length - 1; i >= 0; i--) {
             let b = bullets[i];
             b.x += b.vx; b.y += b.vy; 
@@ -741,7 +761,6 @@
             }
         }
 
-        // 魔王子彈移動與碰撞
         for (let i = bossBullets.length - 1; i >= 0; i--) {
             let b = bossBullets[i];
             b.x += b.vx; b.y += b.vy;
@@ -760,10 +779,9 @@
             )) {
                 playerTakeDamage(1);
                 
-                // 魔王大絕招暈眩效果
                 if (b.type === 'ultimate') {
                     player.isStunned = true;
-                    player.stunTimer = 30; // 0.5秒 (60fps)
+                    player.stunTimer = 30; 
                     showCombatText("暈眩!", player.x, player.y - 50, "yellow");
                 } else {
                     bossBullets.splice(i, 1);
@@ -775,7 +793,6 @@
         let uiDirty = false;
         let chargeDirty = false;
 
-        // 敵人碰撞與更新
         for (let i = enemies.length - 1; i >= 0; i--) {
             let e = enemies[i];
             if (e.type === 'boss') {
@@ -785,9 +802,33 @@
                 if (e.y < 250 || e.y > 350) e.moveDir *= -1;
                 bossAttack(e);
                 bossText.x = e.x; bossText.y = e.y - 60; 
-            } else { e.x -= e.speed; }
+            } else { 
+                // 修正: 小王跳躍式移動邏輯
+                if (e.type === 'smallBoss') {
+                    e.jumpTimer = (e.jumpTimer || 0) + 1;
+                    if (e.jumpTimer < 40) {
+                        // 蓄力 (輕微後退)
+                        e.x -= 0.5;
+                    } else if (e.jumpTimer < 60) {
+                        // 跳躍衝刺
+                        e.x -= e.speed * 3; // 衝刺速度
+                        if (e.jumpTimer === 40) {
+                            // 在跳躍開始時決定 Y 軸變動
+                            e.vy = (Math.random() - 0.5) * 12; 
+                        }
+                        e.y += e.vy;
+                        // 邊界檢查，防止跳出畫面
+                        e.y = Math.min(Math.max(e.y, 150), 350);
+                    } else {
+                        // 休息/重置
+                        e.jumpTimer = 0;
+                    }
+                } else {
+                    // 普通小怪維持直線移動
+                    e.x -= e.speed; 
+                }
+            }
 
-            // 被玩家子彈打中
             for (let j = bullets.length - 1; j >= 0; j--) {
                 let b = bullets[j];
                 
@@ -824,10 +865,8 @@
                             } else {
                                 addCharge();
                                 chargeDirty = true;
-                                // 小王掉落邏輯 (30% 黑色愛心)
                                 if (e.type === 'smallBoss') {
-                                    if (Math.random() < 0.5) { // 50% 機率掉落物品
-                                        // 在掉落物品中，30% 為黑色愛心
+                                    if (Math.random() < 0.5) { 
                                         let itemType = Math.random() < 0.3 ? 'blackHeart' : 'heart';
                                         spawnItem(e.x, e.y, itemType);
                                     }
@@ -930,29 +969,29 @@
 
         // 玩家繪製
         if (!player.isInvincible || Math.floor(frameCount / 5) % 2 === 0) {
-            // 決定要畫哪張圖
-            let imgKey;
-            
-            if (player.isDefending) {
-                // 防禦動畫: 循環播放 d1 ~ d5
-                let defFrame = Math.floor(frameCount / 5) % 5 + 1; 
-                imgKey = 'def' + defFrame;
-                // 繪製防禦動畫，取代圓圈
-                drawSprite(imgKey, player.x, player.y, player.width, player.height, '#00BFFF');
+            // 1. 繪製主角本體 (防禦時也要畫)
+            let isTransitioning = bossActive && !bossSpawned;
+            let isMoving = keys['ArrowUp'] || keys['ArrowDown'] || keys['ArrowLeft'] || keys['ArrowRight'];
+            let bodyImgKey;
+
+            if (player.isAttacking) {
+                bodyImgKey = 'playerAttack';
+            } else if (isMoving || isTransitioning) {
+                bodyImgKey = (Math.floor(frameCount / 8) % 2 === 0) ? 'playerRun1' : 'playerRun2';
             } else {
-                // 正常動作邏輯
-                // 如果在魔王轉場中 (bossActive && !bossSpawned)，強制播放走路動畫
-                let isTransitioning = bossActive && !bossSpawned;
-                let isMoving = keys['ArrowUp'] || keys['ArrowDown'] || keys['ArrowLeft'] || keys['ArrowRight'];
+                bodyImgKey = 'playerRun1';
+            }
+            drawSprite(bodyImgKey, player.x, player.y, player.width, player.height, '#32CD32'); 
+
+            // 2. 繪製防禦動畫 (疊加在主角上)
+            if (player.isDefending) {
+                // 計算幀數 (每5幀換一張)
+                let defFrameIndex = Math.floor(player.defenseDuration / 5);
+                // 限制最大幀數為 4 (即第5張圖 def5)，實現"按住停留在最後一幀"
+                if (defFrameIndex > 4) defFrameIndex = 4;
                 
-                if (player.isAttacking) {
-                    imgKey = 'playerAttack';
-                } else if (isMoving || isTransitioning) {
-                    imgKey = (Math.floor(frameCount / 8) % 2 === 0) ? 'playerRun1' : 'playerRun2';
-                } else {
-                    imgKey = 'playerRun1';
-                }
-                drawSprite(imgKey, player.x, player.y, player.width, player.height, '#32CD32'); 
+                let defImgKey = 'def' + (defFrameIndex + 1);
+                drawSprite(defImgKey, player.x, player.y, player.width, player.height, null);
             }
 
             // 暈眩特效
