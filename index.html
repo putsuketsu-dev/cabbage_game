@@ -418,12 +418,10 @@
         }
     }
 
-    // === 修正 1: 在防禦鍵釋放時，強制重置防禦計數 ===
     function handleFireRelease() {
         if (player.isStunned || !gameRunning) {
             player.isDefending = false;
             fireKeyTimer = 0;
-            // 暈眩狀態下釋放，仍然重置計數，以防意外
             player.guardHitCount = 0; 
             return;
         }
@@ -438,10 +436,8 @@
         player.isDefending = false;
         fireKeyTimer = 0;
         
-        // **核心修正:** 玩家主動放開防禦鍵時，重置格擋計數。
         player.guardHitCount = 0; 
     }
-    // =========================================================
 
     function addCharge(amount = 1) {
         if (player.charge < player.maxCharge) {
@@ -628,7 +624,9 @@
                     enemyType = 'smallBoss'; 
                     eWidth = 130 * SIZE_MULTIPLIER; 
                     eHeight = 130 * SIZE_MULTIPLIER; 
-                    eHp = 8; 
+                    // === 調整 1: 增加小王 HP (8 -> 12) ===
+                    eHp = 12; 
+                    // ======================================
                 }
             }
             
@@ -695,10 +693,7 @@
             if (player.isDefending) {
                 player.defenseDuration++;
             } else { 
-                // === 修正 2: 移除非防禦狀態下的計數重置 (改由 handleFireRelease 負責) ===
                 player.defenseDuration = 0;
-                // player.guardHitCount = 0; <--- 已移除，防止與 handleFireRelease 邏輯衝突
-                // =====================================================================
             }
 
             if (player.isStunned) {
@@ -707,7 +702,7 @@
                 player.isAttacking = false; 
                 if (player.stunTimer <= 0) { // 暈眩 END
                     player.isStunned = false;
-                    // 修正：強制重置防禦/攻擊按鈕狀態 (破防重置機制)
+                    player.guardHitCount = 0; // 確保暈眩解除後重置計數
                     fireKeyTimer = 0;
                     fireKeyPressed = false;
                     keys['Space'] = false; 
@@ -844,11 +839,13 @@
                 } else { 
                     if (e.type === 'smallBoss') {
                         e.jumpTimer = (e.jumpTimer || 0) + 1;
-                        if (e.jumpTimer < 40) {
+                        // === 調整 2: 延長緩慢接近時間 (40 -> 60) ===
+                        if (e.jumpTimer < 60) { 
                             e.x -= 0.5;
-                        } else if (e.jumpTimer < 60) {
+                        // === 調整 2: 調整衝刺階段時間 (40-60 -> 60-80) ===
+                        } else if (e.jumpTimer < 80) { 
                             e.x -= e.speed * 3; 
-                            if (e.jumpTimer === 40) {
+                            if (e.jumpTimer === 60) { // 在進入衝刺時重設跳躍
                                 e.vy = (Math.random() - 0.5) * 12; 
                             }
                             e.y += e.vy;
