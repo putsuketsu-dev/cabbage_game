@@ -377,9 +377,9 @@
         isDefending: false, defenseTimer: 0, charge: 0, maxCharge: 10
     };
 
-    // 主角垂直移動範圍限制 (配合小怪路線)
-    const PLAYER_MIN_Y = 150;
-    const PLAYER_MAX_Y = 350; 
+    // 修正: 調整主角垂直移動範圍，讓路徑下移
+    const PLAYER_MIN_Y = 200; // 主角 Y 頂部邊界
+    const PLAYER_MAX_Y = 380; // 主角 Y 底部邊界
     player.y = (PLAYER_MIN_Y + PLAYER_MAX_Y) / 2; // 確保初始位置在範圍內
 
     let bullets = [];
@@ -645,9 +645,9 @@
                 }
             }
             
-            // 敵人垂直生成範圍限制在主角移動範圍內 [150, 300]
-            const ENEMY_SPAWN_MIN_Y = PLAYER_MIN_Y; 
-            const ENEMY_SPAWN_MAX_Y = PLAYER_MAX_Y - eHeight;
+            // 修正: 擴大敵人垂直生成範圍，避免都擠在同一條線上
+            const ENEMY_SPAWN_MIN_Y = 180; 
+            const ENEMY_SPAWN_MAX_Y = 320; 
             const yRange = ENEMY_SPAWN_MAX_Y - ENEMY_SPAWN_MIN_Y;
 
             let spawnY = ENEMY_SPAWN_MIN_Y + Math.random() * yRange;
