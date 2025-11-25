@@ -26,6 +26,18 @@
             background: #87CEEB; 
             overflow: hidden;
         }
+        
+        /* === 手機橫向全螢幕優化 (新增) === */
+        @media (max-width: 850px) and (orientation: landscape) {
+            #gameContainer {
+                width: 100vw;
+                height: 100vh;
+                max-width: 100vw; /* 移除最大寬度限制 */
+                aspect-ratio: auto; /* 讓寬高填滿視窗 */
+            }
+        }
+        /* ============================== */
+
         canvas {
             width: 100%;
             height: 100%;
@@ -84,10 +96,11 @@
         #btn-right { top: 50px; right: 0; width: 50px; height: 50px; }
 
         #btn-fire {
-            bottom: 40px;
+            /* 攻擊按鈕尺寸修正為 63x63 (原 90x90) */
+            bottom: 30px;
             right: 10px;
-            width: 90px;
-            height: 90px;
+            width: 63px;
+            height: 63px;
             background-color: rgba(255, 255, 255, 0.2);
             border: 3px solid #FFD700;
             background-size: cover; 
@@ -96,7 +109,7 @@
             display: flex; 
             justify-content: center; 
             align-items: center;
-            font-size: 14px;
+            font-size: 12px; /* 配合尺寸調小字體 */
             color: #FFD700;
             text-align: center;
             line-height: 1.2;
@@ -642,7 +655,6 @@
             // 普通關卡保持在左側
             backgroundOffsetX = 0;
         }
-        // 魔王戰期間 (bossSpawned = true)，背景會停留在 targetBackgroundOffsetX (-800)
         // ------------------------
 
         if (fireKeyPressed) {
@@ -953,8 +965,6 @@
         ctx.fillRect(0, 450, canvas.width, 50);
     }
     
-    // (已移除原有的 setInterval 捲動邏輯)
-
     requestAnimationFrame(update);
 </script>
 
