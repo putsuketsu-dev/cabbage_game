@@ -269,9 +269,9 @@
         def3: BASE_URL + 'd3.png',
         def4: BASE_URL + 'd4.png',
         def5: BASE_URL + 'd5.png',
-        // === 新增圖片載入 (大絕動畫) ===
-        playerUltAttack1: BASE_URL + 'ba1.png',
-        playerUltAttack2: BASE_URL + 'ba2.png'
+        // === 載入大絕動畫所需圖片 ===
+        playerUltAttack1: BASE_URL + 'ba1.png', 
+        playerUltAttack2: BASE_URL + 'ba2.png' 
         // ============================
     };
 
@@ -340,8 +340,8 @@
         isDefending: false, defenseTimer: 0, charge: 0, maxCharge: 20,
         isStunned: false, stunTimer: 0,
         defenseDuration: 0, guardHitCount: 0,
-        // === 主角大絕攻擊狀態 ===
-        isUltAttacking: false, ultAttackTimer: 0
+        // === 主角大絕攻擊狀態 (總動畫時間為 30 幀) ===
+        isUltAttacking: false, ultAttackTimer: 0 
         // ============================
     };
 
@@ -414,19 +414,23 @@
     });
 
     function handleFirePress() {
-        if (player.isStunned || !gameRunning) return;
+        // 大絕招動畫期間不能普攻或防禦
+        if (player.isStunned || !gameRunning || player.isUltAttacking) return; 
 
         fireKeyTimer = 0;
         let currentTime = new Date().getTime();
+        // 雙擊判定
         if (currentTime - lastFireReleaseTime < 300 && player.charge >= player.maxCharge) {
             fireSuperMove(); 
             player.isDefending = false; 
+            player.isAttacking = false; 
             fireKeyTimer = 999; 
         }
     }
 
     function handleFireRelease() {
-        if (player.isStunned || !gameRunning || player.isUltAttacking) {
+        // 大絕招動畫期間不能普攻或防禦
+        if (player.isStunned || !gameRunning || player.isUltAttacking) { 
             player.isDefending = false;
             fireKeyTimer = 0;
             player.guardHitCount = 0; 
@@ -435,14 +439,15 @@
 
         lastFireReleaseTime = new Date().getTime();
         if (fireKeyTimer < 15) { 
+            // 短按：普通攻擊
             shoot(); 
             player.isAttacking = true;
             player.attackTimer = 15;
         }
         
+        // 釋放按鍵，防禦解除
         player.isDefending = false;
         fireKeyTimer = 0;
-        
         player.guardHitCount = 0; 
     }
 
@@ -468,9 +473,13 @@
         updateChargeUI(); 
         showSkillText("小高麗的制裁！", player.x, player.y - 50);
         
-        // === 啟用主角大絕攻擊狀態 (動畫持續 30 幀) ===
+        // === 啟用主角大絕攻擊狀態 (總動畫時間設定為 30 幀) ===
         player.isUltAttacking = true;
         player.ultAttackTimer = 30; 
+        
+        // 鎖定主角狀態
+        player.isDefending = false;
+        player.isAttacking = false;
         // ===========================================
 
         bullets.push({
@@ -702,14 +711,20 @@
     function update() {
         if (gameRunning) {
             
-            // === 處理大絕招動畫計時器 ===
+            // === 處理大絕招動畫計時器及鎖定狀態 ===
             if (player.isUltAttacking) {
                 player.ultAttackTimer--;
+                
+                // 大絕招動畫期間，鎖定移動和攻擊狀態
+                keys['ArrowUp'] = keys['ArrowDown'] = keys['ArrowLeft'] = keys['ArrowRight'] = false;
+                player.isAttacking = false;
+                player.isDefending = false;
+
                 if (player.ultAttackTimer <= 0) {
                     player.isUltAttacking = false;
                 }
             }
-            // ===========================
+            // ===================================
 
             if (player.isDefending) {
                 player.defenseDuration++;
@@ -723,13 +738,13 @@
                 player.isAttacking = false; 
                 if (player.stunTimer <= 0) { // 暈眩 END
                     player.isStunned = false;
-                    player.guardHitCount = 0; // 確保暈眩解除後重置計數
+                    player.guardHitCount = 0; 
                     fireKeyTimer = 0;
                     fireKeyPressed = false;
                     keys['Space'] = false; 
                     document.getElementById('btn-fire').classList.remove('pressed'); 
                 }
-            } else {
+            } else if (!player.isUltAttacking) { // 只有在非暈眩且非大絕招動畫時才能執行這些動作
                 if (fireKeyPressed) {
                     fireKeyTimer++;
                     if (fireKeyTimer >= 15) { 
@@ -743,6 +758,7 @@
                     if (player.attackTimer <= 0) player.isAttacking = false;
                 }
 
+                // 移動控制
                 if (keys['ArrowUp']) player.y -= player.speed;
                 if (keys['ArrowDown']) player.y += player.speed;
                 if (keys['ArrowLeft'] && player.x > 0) player.x -= player.speed;
@@ -1036,22 +1052,24 @@
         }
 
         if (!player.isInvincible || Math.floor(frameCount / 5) % 2 === 0) {
-            let isTransitioning = bossActive && !bossSpawned;
             let isMoving = keys['ArrowUp'] || keys['ArrowDown'] || keys['ArrowLeft'] || keys['ArrowRight'];
             let bodyImgKey;
 
-            // === 繪製主角圖片邏輯更新 ===
+            // === 繪製主角圖片邏輯更新 (大絕招交替與停格邏輯) ===
             if (player.isUltAttacking) {
-                // 大絕招動畫 (每 5 幀切換一次)
-                bodyImgKey = (Math.floor(frameCount / 5) % 2 === 0) ? 'playerUltAttack1' : 'playerUltAttack2';
+                if (player.ultAttackTimer > 25) { // 30 -> 26 (5幀, ~0.08秒)
+                    bodyImgKey = 'playerUltAttack1'; 
+                } else { // 25 -> 1 (25幀, ~0.42秒，含您要求的 0.3 秒停格)
+                    bodyImgKey = 'playerUltAttack2';
+                }
             } else if (player.isAttacking) {
                 bodyImgKey = 'playerAttack';
-            } else if (isMoving || isTransitioning) {
+            } else if (isMoving) {
                 bodyImgKey = (Math.floor(frameCount / 8) % 2 === 0) ? 'playerRun1' : 'playerRun2';
             } else {
                 bodyImgKey = 'playerRun1';
             }
-            // ===========================
+            // ===========================================
 
             drawSprite(bodyImgKey, player.x, player.y, player.width, player.height, '#32CD32'); 
 
@@ -1185,6 +1203,10 @@
     document.addEventListener('mozfullscreenchange', handleFullscreenChange);
     document.addEventListener('MSFullscreenChange', handleFullscreenChange);
     
+    // 初始化 UI
+    updateUI(); 
+    
+    // 啟動遊戲循環
     requestAnimationFrame(update);
 </script>
 
