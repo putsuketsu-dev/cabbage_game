@@ -37,8 +37,9 @@
                 height: 105vh !important; 
                 overflow-y: scroll !important;
                 
-                /* 修正點：允許左右捲動 */
-                overflow-x: auto !important;
+                /* 修正點：強制頁面寬度大於視窗，啟用左右捲動 */
+                overflow-x: scroll !important;
+                min-width: 105vw !important; 
             }
             #gameContainer {
                 position: relative;
@@ -376,12 +377,21 @@
         isDefending: false, defenseTimer: 0, charge: 0, maxCharge: 10
     };
 
+    // 主角垂直移動範圍限制 (配合小怪路線)
+    const PLAYER_MIN_Y = 150;
+    const PLAYER_MAX_Y = 350; 
+    player.y = (PLAYER_MIN_Y + PLAYER_MAX_Y) / 2; // 確保初始位置在範圍內
+
     let bullets = [];
     let bossBullets = [];
     let enemies = [];
     let items = []; 
     let combatTexts = []; 
+    
+    // 敵人生成率 (降低數值 = 增加生成頻率)
     let enemySpawnRate = 60;
+    const BASE_SPAWN_RATE = 35; 
+    const RATE_DECREMENT = 10; 
 
     const bossQuotes = ["要加醬嗎？", "沒有吃素齁", "現在吃嗎？"];
     let bossText = { text: "", timer: 0, x: 0, y: 0 };
@@ -616,20 +626,34 @@
     function spawnEnemy() {
         if (bossActive && !bossSpawned) return;
 
+        // 敵人大小調整 40% (1.4 倍線性尺寸)
+        const SIZE_MULTIPLIER = 1.4;
+
         if (!bossActive) {
             let enemyType = 'minion';
-            let eWidth = 110; let eHeight = 110; 
+            let eWidth = 110 * SIZE_MULTIPLIER; // 154
+            let eHeight = 110 * SIZE_MULTIPLIER; // 154
             let eHp = 1 + Math.floor(level / 1.5);
             
             if (level === 2) {
-                if (Math.random() < 0.4) {
+                // 提高小王出現機率到 55%
+                if (Math.random() < 0.55) { 
                     enemyType = 'smallBoss'; 
-                    eWidth = 130; eHeight = 130; 
+                    eWidth = 130 * SIZE_MULTIPLIER; // 182
+                    eHeight = 130 * SIZE_MULTIPLIER; // 182
                     eHp = 8; 
                 }
             }
+            
+            // 敵人垂直生成範圍限制在主角移動範圍內 [150, 300]
+            const ENEMY_SPAWN_MIN_Y = PLAYER_MIN_Y; 
+            const ENEMY_SPAWN_MAX_Y = PLAYER_MAX_Y - eHeight;
+            const yRange = ENEMY_SPAWN_MAX_Y - ENEMY_SPAWN_MIN_Y;
+
+            let spawnY = ENEMY_SPAWN_MIN_Y + Math.random() * yRange;
+            
             enemies.push({
-                x: 800, y: 300 + Math.random() * 120, 
+                x: 800, y: spawnY, 
                 width: eWidth, height: eHeight,
                 speed: enemyType === 'smallBoss' ? 2 : 3 + (level * 0.8),
                 hp: eHp, type: enemyType, maxHp: eHp
@@ -702,10 +726,17 @@
             if (player.attackTimer <= 0) player.isAttacking = false;
         }
 
-        if (keys['ArrowUp'] && player.y > 0) player.y -= player.speed;
-        if (keys['ArrowDown'] && player.y < canvas.height - player.height) player.y += player.speed;
+        // 限制主角移動範圍
+        if (keys['ArrowUp']) player.y -= player.speed;
+        if (keys['ArrowDown']) player.y += player.speed;
         if (keys['ArrowLeft'] && player.x > 0) player.x -= player.speed;
         if (keys['ArrowRight'] && player.x < canvas.width - player.width) player.x += player.speed;
+
+        // 垂直範圍限制
+        player.y = Math.min(Math.max(player.y, PLAYER_MIN_Y), PLAYER_MAX_Y);
+        // 水平邊界檢查 (維持不變)
+        player.x = Math.min(Math.max(player.x, 0), canvas.width - player.width);
+
 
         if (player.isInvincible) {
             player.invincibleTimer--;
@@ -715,8 +746,9 @@
         if (bossText.timer > 0) bossText.timer--;
         if (pendingLevelUp) { performLevelUp(); pendingLevelUp = false; }
         if (!bossActive && !pendingLevelUp) {
+            // 新的敵人生成率計算
+            enemySpawnRate = Math.max(10, BASE_SPAWN_RATE - (level * RATE_DECREMENT)); 
             if (frameCount % enemySpawnRate === 0) spawnEnemy();
-            enemySpawnRate = Math.max(10, 45 - (level * 12)); 
         }
 
         // 道具更新
@@ -817,11 +849,11 @@
                                 if (e.phase === 1) {
                                     evolveBoss(e); 
                                     uiDirty = true;
-                                    bullets.splice(j, 1); // 消耗掉子彈
-                                    break; // 修正：跳出子彈迴圈，避免狀態混亂
+                                    bullets.splice(j, 1); 
+                                    break; 
                                 } else { 
                                     gameWin();
-                                    break; // 跳出子彈迴圈
+                                    break; 
                                 }
                             } else {
                                 addCharge();
