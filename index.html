@@ -313,7 +313,7 @@
     }
 
     // --- 遊戲參數 ---
-    let gameRunning = false; // 修正：等待開始
+    let gameRunning = false; 
     let gameStarted = false; 
     let frameCount = 0;
     let score = 0;
@@ -517,12 +517,12 @@
     function playerTakeDamage(damage) {
         if (player.isDefending) {
             player.guardHitCount++;
-            if (player.guardHitCount >= 5) {
+            if (player.guardHitCount >= 5) { // Defense Break Trigger (破防)
                 player.isDefending = false;
                 player.isStunned = true;
-                player.stunTimer = 60; 
+                player.stunTimer = 60; // Stun duration
                 player.hp -= 1; 
-                player.guardHitCount = 0;
+                player.guardHitCount = 0; // Reset guardHitCount
                 updateHPUI();
                 showCombatText("破防!!", player.x + player.width/2, player.y - 20, "red");
             } else {
@@ -678,7 +678,6 @@
     }
 
     function update() {
-        // 修正：把遊戲邏輯包在 if (gameRunning) 裡，但 requestAnimationFrame 在最後面永遠執行
         if (gameRunning) {
             if (player.isDefending) {
                 player.defenseDuration++;
@@ -691,8 +690,14 @@
                 player.stunTimer--;
                 player.isDefending = false; 
                 player.isAttacking = false; 
-                if (player.stunTimer <= 0) {
+                if (player.stunTimer <= 0) { // 暈眩 END
                     player.isStunned = false;
+                    // === 修正：強制重置防禦/攻擊按鈕狀態 (破防重置機制) ===
+                    fireKeyTimer = 0;
+                    fireKeyPressed = false;
+                    keys['Space'] = false; // 鍵盤狀態重置
+                    document.getElementById('btn-fire').classList.remove('pressed'); // 觸控按鈕視覺重置
+                    // ===============================================
                 }
             } else {
                 if (fireKeyPressed) {
