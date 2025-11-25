@@ -15,7 +15,7 @@
             height: 100vh;
             font-family: 'Microsoft JhengHei', sans-serif;
             
-            /* 允許捲動，解決無法點選底部按鈕的問題 */
+            /* 允許捲動 */
             overflow: auto; 
             touch-action: auto; 
             user-select: none; 
@@ -30,21 +30,22 @@
             box-sizing: border-box; 
         }
         
-        /* === 手機橫向遊玩模式 (啟用捲動，強制露出底部) === */
+        /* === 手機橫向遊玩模式 (啟用捲動) === */
         @media (orientation: landscape) and (max-height: 500px) {
             html, body {
-                /* 關鍵：將內容高度設為略大於可視區域，允許用戶滑動隱藏瀏覽器 UI */
+                /* 允許上下捲動 (105vh 讓內容溢出) */
                 height: 105vh !important; 
                 overflow-y: scroll !important;
-                overflow-x: hidden !important;
+                
+                /* 修正點：允許左右捲動 */
+                overflow-x: auto !important;
             }
             #gameContainer {
-                /* 讓遊戲容器從內容頂部開始排列，而非居中 */
                 position: relative;
                 top: 0; 
                 left: 50%;
-                transform: translateX(-50%); /* 僅水平居中 */
-                margin-top: 10px; /* 稍微離頂部留白 */
+                transform: translateX(-50%); 
+                margin-top: 10px;
 
                 /* 確保 16:10 比例以最大尺寸 fit 整個「可用」視窗 */
                 width: min(100vw, calc(100vh * 1.6));
@@ -667,7 +668,7 @@
         boss.phase = 2; boss.hp = 150; boss.maxHp = 150;
         boss.width = 240; boss.height = 240; boss.y = 250; 
         boss.isCasting = false; 
-        bullets = [];
+        bullets = []; 
     }
 
     function update() {
@@ -813,7 +814,15 @@
 
                         if (e.hp <= 0) {
                             if (e.type === 'boss') {
-                                if (e.phase === 1) evolveBoss(e); else gameWin();
+                                if (e.phase === 1) {
+                                    evolveBoss(e); 
+                                    uiDirty = true;
+                                    bullets.splice(j, 1); // 消耗掉子彈
+                                    break; // 修正：跳出子彈迴圈，避免狀態混亂
+                                } else { 
+                                    gameWin();
+                                    break; // 跳出子彈迴圈
+                                }
                             } else {
                                 addCharge();
                                 chargeDirty = true;
