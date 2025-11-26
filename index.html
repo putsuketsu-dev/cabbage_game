@@ -6,43 +6,65 @@
     <title>小高麗：戰鬥完全進化版</title>
     <style>
         /* === 核心樣式 - 確保所有元素正確顯示 === */
+        html {
+            /* 允許捲動頁面 */
+            overflow-y: auto; 
+        }
         body {
             margin: 0;
             padding: 0;
             background-color: #333;
             display: flex;
             justify-content: center;
+            /* 使用 min-height: 100% 確保內容足夠高 */
+            min-height: 100%; 
             align-items: center;
-            min-height: 100vh; /* 調整為 min-height 允許滾動 */
             font-family: 'Microsoft JhengHei', sans-serif;
-            /* 移除 body 上的 overflow: hidden; */
-            touch-action: none; 
+            /* 允許滾動 */
+            overflow: auto; 
+            touch-action: manipulation; /* 允許瀏覽器手勢，如滾動 */
             user-select: none; 
         }
         #gameContainer {
             position: relative;
             width: 100%;
             max-width: 800px; 
+            /* 確保容器寬高比正確 */
             aspect-ratio: 16/10;
             background: #87CEEB; 
             overflow: hidden;
             box-sizing: border-box; 
         }
         
-        /* === 手機橫向遊玩模式 (優化) - 允許頁面滾動 === */
+        /* === 手機橫向遊玩模式 (橫向捲動修正) === */
         @media (orientation: landscape) and (max-height: 500px) {
             html, body {
-                height: 100vh; 
-                overflow: auto; /* 允許滾動以調整畫面位置 */
+                /* 讓視窗內容可以超過實際高度 */
+                height: auto; 
+                min-height: 100vh; /* 確保至少有一個視窗高 */
+                overflow: auto !important; /* 強制允許滾動 */
+                touch-action: auto !important; /* 允許所有手勢 */
             }
             #gameContainer {
+                /* 根據視窗尺寸計算最適合的寬高，確保不超出 (但 body 可以) */
                 width: min(100vw, calc(100vh * 1.6));
                 height: min(100vh, calc(100vw / 1.6));
                 max-width: none; 
+                /* 確保容器上下左右置中 */
+                margin: auto; 
+            }
+            
+            /* * 最終保險：在橫向模式下，我們給 body 一個微小的額外高度，
+             * 確保內容高度 (min-height: 100vh) 略大於視窗高度，強制啟動滾動。
+             */
+            body:after {
+                content: "";
+                display: block;
+                height: 1px; /* 增加 1px 高度 */
             }
         }
         
-        /* === Fullscreen API 樣式 === */
+        /* === Fullscreen API 樣式 (全螢幕下仍然強制全屏鎖定) === */
         #gameContainer:fullscreen, #gameContainer:-webkit-full-screen, #gameContainer:-moz-full-screen, #gameContainer:-ms-fullscreen {
             width: 100vw !important;
             height: 100vh !important;
@@ -210,7 +232,7 @@
     </div>
 
     <div id="startScreen">
-        <h1 style="color: #00FFFF; text-shadow: 2px 2px 0 #000;">小高麗冒險</h1>
+        <h1 style="color: #00FFFF; text-shadow: 2px 2px 0 #000;">小高麗大戰粽子王</h1>
         <p>準備好你的手指！</p>
         <button onclick="startGame()">開始遊戲</button>
     </div>
@@ -720,7 +742,7 @@
         
         updateUI();
 
-        // 【調整點】: 強制走路動畫時間調整為 0.8 秒
+        // 【修正點】: 強制走路動畫時間調整為 0.8 秒
         setTimeout(() => {
             player.isForcedMoving = false;
         }, 800); 
@@ -833,7 +855,7 @@
             }
             
             // === 移動控制邏輯 ===
-            if (!player.isStunned && !player.isUltAttacking) {
+            if (!player.isStunned && !player.isUltAttacking && !player.isForcedMoving) {
                 if (keys['ArrowUp']) player.y -= player.speed;
                 if (keys['ArrowDown']) player.y += player.speed;
                 if (keys['ArrowLeft'] && player.x > 0) player.x -= player.speed;
