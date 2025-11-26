@@ -502,6 +502,7 @@
         player.isUltAttacking = true;
         player.ultAttackTimer = 30; 
         
+        // 發大招時強制清空防禦和普通攻擊狀態
         player.isDefending = false;
         player.isAttacking = false;
         player.isStunned = false; 
@@ -724,8 +725,9 @@
         bossActive = true; 
         bossSpawned = true;
         
-        // 【修正點 1】: 警語出現時即解除所有鎖定 (修復無法攻擊和動畫鎖定問題)
+        // 【修正點 1】: 轉場徹底終結，確保 player.isForcedMoving 解除，且背景停止滾動。
         player.isForcedMoving = false; 
+        backgroundOffsetX = targetBackgroundOffsetX; 
         
         // 確保攻擊狀態和輸入被徹底重置
         fireKeyPressed = false; 
@@ -774,6 +776,12 @@
 
                 if (player.ultAttackTimer <= 0) {
                     player.isUltAttacking = false;
+                    
+                    // 【修正點 2】: 大招結束時，強制清除所有攻擊輸入狀態，防止誤觸防禦
+                    fireKeyPressed = false; 
+                    fireKeyTimer = 0;
+                    keys['Space'] = false;
+                    document.getElementById('btn-fire').classList.remove('pressed');
                 }
             }
 
@@ -803,7 +811,6 @@
             } 
 
             // 處理攻擊/防禦狀態 (只在非鎖定狀態下處理)
-            // 由於 realSpawnBoss 已經解除 isForcedMoving, 此處邏輯正確，允許攻擊。
             if (!player.isStunned && !player.isUltAttacking && !player.isForcedMoving) { 
                 if (fireKeyPressed) {
                     fireKeyTimer++;
@@ -834,9 +841,8 @@
                 if (backgroundOffsetX > targetBackgroundOffsetX) {
                     backgroundOffsetX -= backgroundScrollSpeed;
                 } else {
+                    // 背景到達終點，觸發魔王生成
                     backgroundOffsetX = targetBackgroundOffsetX;
-                    // 背景停止，轉場完成，呼叫 realSpawnBoss 解除 player.isForcedMoving
-                    // 此處調用 realSpawnBoss，並依據您的要求在其中解除鎖定
                     realSpawnBoss();
                 }
                 player.isForcedMoving = true; 
@@ -944,6 +950,7 @@
             for (let i = enemies.length - 1; i >= 0; i--) {
                 let e = enemies[i];
                 if (e.type === 'boss') {
+                    // 魔王戰鬥中，背景不再滾動，魔王移動邏輯不受影響
                     if (e.x > canvas.width - 250) e.x -= e.speed;
                     let moveSpeed = e.phase === 2 ? e.speed * 2 : e.speed;
                     e.y += moveSpeed * e.moveDir;
@@ -1128,6 +1135,7 @@
         // 繪製背景
         if (imageLoaded['background']) {
             try {
+                // 轉場期間，背景滾動
                 ctx.drawImage(images['background'], backgroundOffsetX, 0, 1600, 500);
             } catch(e) {
                 drawFallbackBackground();
@@ -1146,7 +1154,7 @@
 
         if (!player.isInvincible || Math.floor(frameCount / 5) % 2 === 0) {
             
-            // 修正 2: 轉場結束後，走路動畫只在玩家實際移動時觸發。
+            // 判斷是否移動 (排除強制移動狀態對動畫的鎖定)
             let isMoving = keys['ArrowUp'] || keys['ArrowDown'] || keys['ArrowLeft'] || keys['ArrowRight'];
             let bodyImgKey;
 
