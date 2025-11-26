@@ -359,9 +359,9 @@
     let lastFireReleaseTime = 0;
 
     window.addEventListener('keydown', (e) => {
-        // 轉場時，只允許移動控制，鎖定攻擊/防禦 (Space)
-        if (player.isForcedMoving && e.code === 'Space') return;
-        // 角色被鎖定，不接受任何輸入
+        // 轉場期間 (isForcedMoving) 或角色被鎖定 (Stun/Ult)，不允許攻擊/防禦 (Space)
+        if ((player.isForcedMoving || player.isStunned || player.isUltAttacking) && e.code === 'Space') return;
+        // 角色被鎖定 (Stun/Ult)，不接受任何輸入
         if (player.isStunned || player.isUltAttacking) return;
 
 
@@ -374,9 +374,9 @@
         }
     });
     window.addEventListener('keyup', (e) => {
-        // 轉場時，只允許移動控制，鎖定攻擊/防禦 (Space)
-        if (player.isForcedMoving && e.code === 'Space') return;
-        // 角色被鎖定，不接受任何輸入
+        // 轉場期間 (isForcedMoving) 或角色被鎖定 (Stun/Ult)，不允許攻擊/防禦 (Space)
+        if ((player.isForcedMoving || player.isStunned || player.isUltAttacking) && e.code === 'Space') return;
+        // 角色被鎖定 (Stun/Ult)，不接受任何輸入
         if (player.isStunned || player.isUltAttacking) return;
         
         keys[e.code] = false;
@@ -392,12 +392,12 @@
             e.preventDefault();
             const key = btn.getAttribute('data-key');
 
-            // 轉場時鎖定攻擊按鈕
-            if (player.isForcedMoving && key === 'Space') {
+            // 轉場時鎖定攻擊按鈕 (Space)
+            if ((player.isForcedMoving || player.isStunned || player.isUltAttacking) && key === 'Space') {
                 btn.classList.remove('pressed'); 
                 return;
             }
-            // 角色被鎖定，不接受任何輸入
+            // 角色被鎖定 (Stun/Ult)，不接受任何輸入
             if (player.isStunned || player.isUltAttacking) {
                 btn.classList.remove('pressed'); 
                 return;
@@ -414,12 +414,12 @@
             e.preventDefault();
             const key = btn.getAttribute('data-key');
             
-            // 轉場時鎖定攻擊按鈕
-            if (player.isForcedMoving && key === 'Space') {
+            // 轉場時鎖定攻擊按鈕 (Space)
+            if ((player.isForcedMoving || player.isStunned || player.isUltAttacking) && key === 'Space') {
                  btn.classList.remove('pressed'); 
                  return;
             }
-            // 角色被鎖定，不處理釋放事件
+            // 角色被鎖定 (Stun/Ult)，不處理釋放事件
             if (player.isStunned || player.isUltAttacking) {
                  btn.classList.remove('pressed'); 
                  return;
@@ -712,7 +712,8 @@
         bossActive = true;
         bossSpawned = false;
         player.isForcedMoving = true; 
-        // 轉場時，只鎖定攻擊和防禦狀態
+        
+        // 只鎖定攻擊/防禦狀態，移動輸入保持開啟
         player.isAttacking = false;
         player.isDefending = false;
         
@@ -722,7 +723,11 @@
     function realSpawnBoss() {
         bossActive = true; 
         bossSpawned = true;
-        player.isForcedMoving = false; // 轉場結束，停止強制走動並解除控制鎖定
+        player.isForcedMoving = false; // 修正 1 & 3: 轉場結束，停止強制走動並解除控制鎖定
+        
+        // 確保攻擊/防禦鎖定也被解除 (因為 fireKeyPressed/fireKeyTimer 可能還被鎖定在 event handler 裡)
+        fireKeyPressed = false; 
+        fireKeyTimer = 0;
         
         bossWarningEl.style.display = 'block';
         setTimeout(() => bossWarningEl.style.display = 'none', 3000);
@@ -793,7 +798,8 @@
             } 
 
             // 處理攻擊/防禦狀態 (只在非鎖定狀態下處理)
-            if (!player.isStunned && !player.isUltAttacking && !player.isForcedMoving) {
+            // 修正 2: isForcedMoving 狀態下不處理攻擊/防禦
+            if (!player.isStunned && !player.isUltAttacking && !player.isForcedMoving) { 
                 if (fireKeyPressed) {
                     fireKeyTimer++;
                     if (fireKeyTimer >= 15) { 
@@ -808,12 +814,12 @@
                 }
             }
             
-            // === 修正 1. 移動控制邏輯 (轉場時允許移動) ===
+            // === 移動控制邏輯 (修正 2: 轉場期間允許移動) ===
             // 只要不是暈眩或大招狀態，就可以處理移動輸入
             if (!player.isStunned && !player.isUltAttacking) {
                 if (keys['ArrowUp']) player.y -= player.speed;
                 if (keys['ArrowDown']) player.y += player.speed;
-                // 轉場時，主角會被背景拉著往右移動，所以水平移動輸入應該是微調 (可選，這裡先保持全速移動)
+                // 轉場期間，左右移動仍由玩家控制微調位置
                 if (keys['ArrowLeft'] && player.x > 0) player.x -= player.speed;
                 if (keys['ArrowRight'] && player.x < canvas.width - player.width) player.x += player.speed;
             }
@@ -825,9 +831,10 @@
                     backgroundOffsetX -= backgroundScrollSpeed;
                 } else {
                     backgroundOffsetX = targetBackgroundOffsetX;
+                    // 背景停止，轉場完成
                     realSpawnBoss();
                 }
-                player.isForcedMoving = true; 
+                player.isForcedMoving = true; // 轉場期間維持強制走動動畫
             } else if (!bossActive) {
                 backgroundOffsetX = 0;
                 player.isForcedMoving = false;
@@ -1134,7 +1141,7 @@
 
         if (!player.isInvincible || Math.floor(frameCount / 5) % 2 === 0) {
             
-            // 轉場時 player.isForcedMoving 為 true, 確保有走動動畫
+            // 修正 2/3: 轉場時 player.isForcedMoving 為 true, 確保有走動動畫。轉場結束後，由移動輸入決定。
             let isMoving = keys['ArrowUp'] || keys['ArrowDown'] || keys['ArrowLeft'] || keys['ArrowRight'];
             let bodyImgKey;
 
@@ -1144,12 +1151,12 @@
                 } else { 
                     bodyImgKey = 'playerUltAttack2';
                 }
-            } else if (player.isForcedMoving || isMoving) { 
+            } else if (player.isForcedMoving || isMoving) { // 如果是強制走動狀態 OR 玩家正在移動
                 bodyImgKey = (Math.floor(frameCount / 8) % 2 === 0) ? 'playerRun1' : 'playerRun2';
             } else if (player.isAttacking) {
                 bodyImgKey = 'playerAttack';
             } else {
-                bodyImgKey = 'playerRun1';
+                bodyImgKey = 'playerRun1'; // 靜止狀態
             }
 
             drawSprite(bodyImgKey, player.x, player.y, player.width, player.height, '#32CD32'); 
