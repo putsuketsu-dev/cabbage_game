@@ -6,30 +6,24 @@
     <title>小高麗：戰鬥完全進化版</title>
     <style>
         /* === 核心樣式 - 確保所有元素正確顯示 === */
-        html {
-            /* 允許捲動頁面 */
-            overflow-y: auto; 
-        }
+        html { overflow-y: auto; }
         body {
             margin: 0;
             padding: 0;
             background-color: #333;
             display: flex;
             justify-content: center;
-            /* 使用 min-height: 100% 確保內容足夠高 */
             min-height: 100%; 
             align-items: center;
             font-family: 'Microsoft JhengHei', sans-serif;
-            /* 允許滾動 */
             overflow: auto; 
-            touch-action: manipulation; /* 允許瀏覽器手勢，如滾動 */
+            touch-action: manipulation; 
             user-select: none; 
         }
         #gameContainer {
             position: relative;
             width: 100%;
             max-width: 800px; 
-            /* 確保容器寬高比正確 */
             aspect-ratio: 16/10;
             background: #87CEEB; 
             overflow: hidden;
@@ -39,32 +33,25 @@
         /* === 手機橫向遊玩模式 (橫向捲動修正) === */
         @media (orientation: landscape) and (max-height: 500px) {
             html, body {
-                /* 讓視窗內容可以超過實際高度 */
                 height: auto; 
-                min-height: 100vh; /* 確保至少有一個視窗高 */
-                overflow: auto !important; /* 強制允許滾動 */
-                touch-action: auto !important; /* 允許所有手勢 */
+                min-height: 100vh; 
+                overflow: auto !important; 
+                touch-action: auto !important; 
             }
             #gameContainer {
-                /* 根據視窗尺寸計算最適合的寬高，確保不超出 (但 body 可以) */
                 width: min(100vw, calc(100vh * 1.6));
                 height: min(100vh, calc(100vw / 1.6));
                 max-width: none; 
-                /* 確保容器上下左右置中 */
                 margin: auto; 
             }
-            
-            /* * 最終保險：在橫向模式下，我們給 body 一個微小的額外高度，
-             * 確保內容高度 (min-height: 100vh) 略大於視窗高度，強制啟動滾動。
-             */
             body:after {
                 content: "";
                 display: block;
-                height: 1px; /* 增加 1px 高度 */
+                height: 1px; 
             }
         }
         
-        /* === Fullscreen API 樣式 (全螢幕下仍然強制全屏鎖定) === */
+        /* === Fullscreen API 樣式 === */
         #gameContainer:fullscreen, #gameContainer:-webkit-full-screen, #gameContainer:-moz-full-screen, #gameContainer:-ms-fullscreen {
             width: 100vw !important;
             height: 100vh !important;
@@ -91,6 +78,14 @@
             pointer-events: none;
             z-index: 5;
         }
+        /* 讓按鈕可以被點擊 */
+        .interactive-btn {
+            pointer-events: auto;
+            cursor: pointer;
+            margin-top: 5px;
+            color: #00FFFF;
+        }
+        
         #controls {
             position: absolute;
             bottom: 0px;
@@ -211,7 +206,8 @@
         <div>Lv: <span id="level">1</span> | <span id="nextLevel">還需擊退: 20</span></div>
         <div>Score: <span id="score">0</span></div>
         <div style="font-size: 12px; color: #FFD700; margin-top: 5px;">💡 雙擊=大絕(1.5倍傷) | 長按=防禦</div>
-        <div id="fullscreenBtn" style="cursor: pointer; color: #00FFFF; font-size: 14px; font-weight: bold; margin-top: 5px; pointer-events: auto;">[全螢幕模式]</div>
+        <div id="soundBtn" class="interactive-btn">🔊 音效: 開</div>
+        <div id="fullscreenBtn" class="interactive-btn">[全螢幕模式]</div>
     </div>
     
     <div id="bossWarning">⚠️ 魔王來襲 ⚠️</div>
@@ -232,7 +228,7 @@
     </div>
 
     <div id="startScreen">
-        <h1 style="color: #00FFFF; text-shadow: 2px 2px 0 #000;">小高麗大戰粽子王</h1>
+        <h1 style="color: #00FFFF; text-shadow: 2px 2px 0 #000;">小高麗冒險</h1>
         <p>準備好你的手指！</p>
         <button onclick="startGame()">開始遊戲</button>
     </div>
@@ -261,6 +257,7 @@
     const skillContainer = document.getElementById('skillContainer');
     const btnFire = document.getElementById('btn-fire');
     const fullscreenBtn = document.getElementById('fullscreenBtn');
+    const soundBtn = document.getElementById('soundBtn');
 
     // --- 圖片載入 ---
     const BASE_URL = 'https://raw.githubusercontent.com/putsuketsu-dev/Cabbage/main/';
@@ -287,9 +284,18 @@
         playerUltAttack2: BASE_URL + 'ba2.png' 
     };
 
+    // --- 音樂載入 ---
+    const audioSources = {
+        bgm: BASE_URL + 'game.bgm.mp3',
+        shoot: BASE_URL + 'shoot3.mp3',
+        ult: BASE_URL + 'attack3.mp3'
+    };
+
     const images = {};
     const imageLoaded = {};
+    const sounds = {};
 
+    // 載入圖片
     for (let key in imageSources) {
         images[key] = new Image();
         images[key].crossOrigin = "Anonymous";
@@ -302,6 +308,53 @@
         images[key].onerror = () => { imageLoaded[key] = false; };
         images[key].src = imageSources[key];
     }
+
+    // 載入音效
+    let isSoundEnabled = true;
+
+    function initAudio() {
+        // 背景音樂
+        sounds.bgm = new Audio(audioSources.bgm);
+        sounds.bgm.loop = true;
+        sounds.bgm.volume = 0.7;
+
+        // 音效 (普通攻擊)
+        sounds.shoot = new Audio(audioSources.shoot);
+        sounds.shoot.volume = 0.7;
+
+        // 音效 (大絕招)
+        sounds.ult = new Audio(audioSources.ult);
+        sounds.ult.volume = 0.7;
+    }
+    initAudio();
+
+    function playSound(name) {
+        if (!isSoundEnabled || !sounds[name]) return;
+        // 對於音效，重置時間以允許連發
+        if (name === 'shoot' || name === 'ult') {
+            sounds[name].currentTime = 0;
+        }
+        sounds[name].play().catch(e => {/* 忽略自動播放阻擋錯誤 */});
+    }
+
+    function stopBGM() {
+        if (sounds.bgm) {
+            sounds.bgm.pause();
+            sounds.bgm.currentTime = 0;
+        }
+    }
+
+    // 音效開關事件
+    soundBtn.addEventListener('click', () => {
+        isSoundEnabled = !isSoundEnabled;
+        soundBtn.innerText = isSoundEnabled ? "🔊 音效: 開" : "🔇 音效: 關";
+        
+        if (isSoundEnabled) {
+            if (gameRunning) sounds.bgm.play().catch(e=>{});
+        } else {
+            sounds.bgm.pause();
+        }
+    });
 
     function drawSprite(imgKey, x, y, w, h, fallbackColor, shape='rect', sourceX=0, sourceY=0, sourceW=0, sourceH=0) {
         if (imageLoaded[imgKey]) {
@@ -381,11 +434,8 @@
     let lastFireReleaseTime = 0;
 
     window.addEventListener('keydown', (e) => {
-        // 轉場期間 (isForcedMoving) 現在允許攻擊
-        if ((player.isStunned || player.isUltAttacking) && e.code === 'Space') return;
-        // 角色被鎖定 (Stun/Ult)，不接受移動輸入
+        if ((player.isForcedMoving || player.isStunned || player.isUltAttacking) && e.code === 'Space') return;
         if (player.isStunned || player.isUltAttacking) return;
-
 
         keys[e.code] = true;
         if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code)) e.preventDefault();
@@ -396,9 +446,7 @@
         }
     });
     window.addEventListener('keyup', (e) => {
-        // 轉場期間 (isForcedMoving) 現在允許攻擊
-        if ((player.isStunned || player.isUltAttacking) && e.code === 'Space') return;
-        // 角色被鎖定 (Stun/Ult)，不接受移動輸入
+        if ((player.isForcedMoving || player.isStunned || player.isUltAttacking) && e.code === 'Space') return;
         if (player.isStunned || player.isUltAttacking) return;
         
         keys[e.code] = false;
@@ -414,12 +462,10 @@
             e.preventDefault();
             const key = btn.getAttribute('data-key');
 
-            // 轉場期間 (isForcedMoving) 現在允許攻擊
-            if ((player.isStunned || player.isUltAttacking) && key === 'Space') {
+            if ((player.isForcedMoving || player.isStunned || player.isUltAttacking) && key === 'Space') {
                 btn.classList.remove('pressed'); 
                 return;
             }
-            // 角色被鎖定 (Stun/Ult)，不接受輸入
             if (player.isStunned || player.isUltAttacking) {
                 btn.classList.remove('pressed'); 
                 return;
@@ -436,12 +482,10 @@
             e.preventDefault();
             const key = btn.getAttribute('data-key');
             
-            // 轉場期間 (isForcedMoving) 現在允許攻擊
-            if ((player.isStunned || player.isUltAttacking) && key === 'Space') {
+            if ((player.isForcedMoving || player.isStunned || player.isUltAttacking) && key === 'Space') {
                  btn.classList.remove('pressed'); 
                  return;
             }
-            // 角色被鎖定 (Stun/Ult)，不處理釋放事件
             if (player.isStunned || player.isUltAttacking) {
                  btn.classList.remove('pressed'); 
                  return;
@@ -462,12 +506,10 @@
     });
 
     function handleFirePress() {
-        // 轉場期間 (isForcedMoving) 現在允許攻擊
-        if (player.isStunned || !gameRunning || player.isUltAttacking) return; 
+        if (player.isStunned || !gameRunning || player.isUltAttacking || player.isForcedMoving) return; 
 
         fireKeyTimer = 0;
         let currentTime = new Date().getTime();
-        // 雙擊判定
         if (currentTime - lastFireReleaseTime < 300 && player.charge >= player.maxCharge) {
             fireSuperMove(); 
             player.isDefending = false; 
@@ -477,8 +519,7 @@
     }
 
     function handleFireRelease() {
-        // 轉場期間 (isForcedMoving) 現在允許攻擊
-        if (player.isStunned || !gameRunning || player.isUltAttacking) { 
+        if (player.isStunned || !gameRunning || player.isUltAttacking || player.isForcedMoving) { 
             player.isDefending = false;
             fireKeyTimer = 0;
             player.guardHitCount = 0; 
@@ -487,13 +528,11 @@
 
         lastFireReleaseTime = new Date().getTime();
         if (fireKeyTimer < 15) { 
-            // 短按：普通攻擊
             shoot(); 
             player.isAttacking = true;
             player.attackTimer = 15;
         }
         
-        // 釋放按鍵，防禦解除
         player.isDefending = false;
         fireKeyTimer = 0;
         player.guardHitCount = 0; 
@@ -521,10 +560,12 @@
         updateChargeUI(); 
         showSkillText("小高麗的制裁！", player.x, player.y - 50);
         
+        // 播放大絕音效
+        playSound('ult');
+
         player.isUltAttacking = true;
         player.ultAttackTimer = 30; 
         
-        // 發大招時強制清空防禦和普通攻擊狀態
         player.isDefending = false;
         player.isAttacking = false;
         player.isStunned = false; 
@@ -561,6 +602,9 @@
     function shoot() {
         if(player.isDefending || player.isUltAttacking) return; 
 
+        // 播放射擊音效
+        playSound('shoot');
+
         let bulletCount = 1;
         if (level === 2) bulletCount = 3;
         if (level >= 3) bulletCount = 5; 
@@ -594,7 +638,7 @@
             
             player.guardHitCount += hitCount;
             
-            if (player.guardHitCount >= 5) { // Defense Break Trigger (破防)
+            if (player.guardHitCount >= 5) { 
                 player.isDefending = false;
                 player.isStunned = true;
                 player.stunTimer = 60; 
@@ -734,35 +778,27 @@
     function triggerBossStage() {
         bossActive = true;
         bossSpawned = false;
-        player.isForcedMoving = true; // 啟動強制動畫
-        
-        // 鎖定攻擊/防禦狀態在發動大招時會自動解除
+        player.isForcedMoving = true; 
         player.isAttacking = false;
         player.isDefending = false;
         
         updateUI();
 
-        // 【修正點】: 強制走路動畫時間調整為 0.8 秒
         setTimeout(() => {
             player.isForcedMoving = false;
-        }, 800); 
+        }, 500); 
     }
 
     function realSpawnBoss() {
         bossActive = true; 
         bossSpawned = true;
-        
-        // 確保強制移動狀態不會鎖定後續邏輯
         player.isForcedMoving = false; 
-        backgroundOffsetX = targetBackgroundOffsetX; 
         
-        // 確保攻擊狀態和輸入被徹底重置
         fireKeyPressed = false; 
         fireKeyTimer = 0;
         keys['Space'] = false; 
         document.getElementById('btn-fire').classList.remove('pressed'); 
         
-        // 顯示警語，並設定其消失時間
         bossWarningEl.style.display = 'block';
         setTimeout(() => bossWarningEl.style.display = 'none', 3000);
 
@@ -791,11 +827,9 @@
     function update() {
         if (gameRunning) {
             
-            // 處理大絕招動畫計時器及鎖定狀態
             if (player.isUltAttacking) {
                 player.ultAttackTimer--;
                 
-                // 大招期間鎖定所有控制
                 keys['ArrowUp'] = keys['ArrowDown'] = keys['ArrowLeft'] = keys['ArrowRight'] = false;
                 player.isAttacking = false;
                 player.isDefending = false;
@@ -804,7 +838,6 @@
                 if (player.ultAttackTimer <= 0) {
                     player.isUltAttacking = false;
                     
-                    // 大招結束時，強制清除所有攻擊輸入狀態
                     fireKeyPressed = false; 
                     fireKeyTimer = 0;
                     keys['Space'] = false;
@@ -824,7 +857,6 @@
                 player.isAttacking = false; 
                 player.isForcedMoving = false; 
                 
-                // 暈眩期間也解除移動輸入
                 keys['ArrowUp'] = keys['ArrowDown'] = keys['ArrowLeft'] = keys['ArrowRight'] = false;
                 
                 if (player.stunTimer <= 0) { 
@@ -837,11 +869,9 @@
                 }
             } 
 
-            // 處理攻擊/防禦狀態 (只在非鎖定狀態下處理)
-            if (!player.isStunned && !player.isUltAttacking) { 
+            if (!player.isStunned && !player.isUltAttacking && !player.isForcedMoving) { 
                 if (fireKeyPressed) {
                     fireKeyTimer++;
-                    // 長按 -> 防禦
                     if (fireKeyTimer >= 15) { 
                         player.isDefending = true; 
                         player.isAttacking = false;
@@ -854,21 +884,17 @@
                 }
             }
             
-            // === 移動控制邏輯 ===
-            if (!player.isStunned && !player.isUltAttacking && !player.isForcedMoving) {
+            if (!player.isStunned && !player.isUltAttacking) {
                 if (keys['ArrowUp']) player.y -= player.speed;
                 if (keys['ArrowDown']) player.y += player.speed;
                 if (keys['ArrowLeft'] && player.x > 0) player.x -= player.speed;
                 if (keys['ArrowRight'] && player.x < canvas.width - player.width) player.x += player.speed;
             }
-            // ============================================
 
-            // 轉場邏輯 (只控制背景滾動和魔王生成)
             if (bossActive && !bossSpawned) {
                 if (backgroundOffsetX > targetBackgroundOffsetX) {
                     backgroundOffsetX -= backgroundScrollSpeed;
                 } else {
-                    // 背景到達終點，觸發魔王生成
                     backgroundOffsetX = targetBackgroundOffsetX;
                     realSpawnBoss();
                 }
@@ -888,7 +914,6 @@
             
             if (bossText.timer > 0) bossText.timer--;
             
-            // 擊退所有敵人後才轉場
             if (pendingLevelUp) { 
                 if (enemies.length === 0) {
                     performLevelUp(); 
@@ -977,7 +1002,6 @@
             for (let i = enemies.length - 1; i >= 0; i--) {
                 let e = enemies[i];
                 if (e.type === 'boss') {
-                    // 魔王戰鬥中，背景不再滾動，魔王移動邏輯不受影響
                     if (e.x > canvas.width - 250) e.x -= e.speed;
                     let moveSpeed = e.phase === 2 ? e.speed * 2 : e.speed;
                     e.y += moveSpeed * e.moveDir;
@@ -1132,10 +1156,14 @@
         gameRunning = true;
         startScreen.style.display = 'none';
         frameCount = 0; 
+        
+        // 播放 BGM
+        playSound('bgm');
     }
 
     function gameWin() {
         gameRunning = false;
+        stopBGM();
         document.getElementById('endTitle').innerText = "恭喜通關!";
         finalScoreEl.innerText = score;
         gameOverScreen.style.display = 'block';
@@ -1143,6 +1171,7 @@
 
     function gameOver(reason) {
         gameRunning = false;
+        stopBGM();
         document.getElementById('endTitle').innerText = "遊戲結束";
         finalScoreEl.innerText = score;
         let p = document.createElement('p'); p.innerText = reason; p.style.color='red';
@@ -1192,7 +1221,7 @@
                     bodyImgKey = 'playerUltAttack2';
                 }
             } else if (player.isForcedMoving || isMoving) { 
-                // 強制走動狀態 (固定 0.8s) OR 玩家正在移動時，顯示走路動畫
+                // 強制走動狀態 (固定 0.5s) OR 玩家正在移動時，顯示走路動畫
                 bodyImgKey = (Math.floor(frameCount / 8) % 2 === 0) ? 'playerRun1' : 'playerRun2';
             } else if (player.isAttacking) {
                 bodyImgKey = 'playerAttack';
