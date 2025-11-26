@@ -16,7 +16,7 @@
             height: 100vh;
             font-family: 'Microsoft JhengHei', sans-serif;
             overflow: hidden; 
-            touch-action: none; /* 禁用瀏覽器手勢 */
+            touch-action: none; 
             user-select: none; 
         }
         #gameContainer {
@@ -101,7 +101,6 @@
             align-items: center;
             font-size: 14px; 
             color: rgba(255, 255, 255, 0.7);
-            /* 修正：允許觸控事件不被操作 (for control-group) */
             touch-action: manipulation; 
             width: 30px; 
             height: 30px; 
@@ -113,17 +112,15 @@
         #btn-left { top: 30px; left: 0; }
         #btn-right { top: 30px; right: 0; }
 
-        /* === 攻擊按鈕樣式 (重點修復) === */
+        /* === 攻擊按鈕樣式 === */
         #btn-fire {
             bottom: 30px; right: 10px; width: 63px; height: 63px;
             background-color: rgba(255, 255, 255, 0.15);
             border: 3px solid rgba(255, 215, 0, 0.5);
-            /* 確保圖示顯示 */
             background-size: cover; background-position: center; background-repeat: no-repeat;
             display: flex; justify-content: center; align-items: center;
             font-size: 12px; color: #FFD700; text-align: center; line-height: 1.2;
             --progress: 0%; 
-            /* 圓形進度條/底色 */
             background-image: radial-gradient(closest-side, rgba(0,0,0,0.5) 79%, transparent 80% 100%),
                               conic-gradient(#00FFFF var(--progress), rgba(255,255,255,0.2) 0);
             border: 4px solid rgba(255,255,255,0.3);
@@ -131,11 +128,9 @@
             transition: border-color 0.3s;
             transform: translateY(15px);
         }
-        /* 攻擊圖示層 */
         #btn-fire::after {
             content: ''; position: absolute; top: 50%; left: 50%;
             transform: translate(-50%, -50%); width: 75%; height: 75%;
-            /* 這裡使用 JS 設定的 --icon-url 變數來顯示圖片 */
             background-image: var(--icon-url); 
             background-size: contain;
             background-position: center; background-repeat: no-repeat;
@@ -215,7 +210,7 @@
     </div>
 
     <div id="startScreen">
-        <h1 style="color: #00FFFF; text-shadow: 2px 2px 0 #000;">小高麗冒險</h1>
+        <h1 style="color: #00FFFF; text-shadow: 2px 2px 0 #000;">小高麗大戰粽子軍團</h1>
         <p>準備好你的手指！</p>
         <button onclick="startGame()">開始遊戲</button>
     </div>
@@ -246,14 +241,13 @@
     const fullscreenBtn = document.getElementById('fullscreenBtn');
 
     // --- 圖片載入 ---
-    // 圖片庫地址（確認正確）
     const BASE_URL = 'https://raw.githubusercontent.com/putsuketsu-dev/Cabbage/main/';
     const imageSources = {
         background: BASE_URL + 'BG.jpg',
         playerRun1: BASE_URL + '主角走路1.png',
         playerRun2: BASE_URL + '主角走路2.png',
         playerAttack: BASE_URL + '主角攻擊.png',
-        playerBullet: BASE_URL + '主角招式.png', // 攻擊按鈕圖示
+        playerBullet: BASE_URL + '主角招式.png', 
         boss1: BASE_URL + '魔王1.png',
         boss2: BASE_URL + '魔王2.png',
         bossUltAnim: BASE_URL + '魔王開大絕.png',
@@ -279,7 +273,6 @@
         images[key].crossOrigin = "Anonymous";
         images[key].onload = () => {
             imageLoaded[key] = true;
-            // 修正：確保按鈕圖示正確設置
             if(key === 'playerBullet') {
                 btnFire.style.setProperty('--icon-url', `url('${imageSources[key]}')`);
             }
@@ -300,7 +293,6 @@
                 drawShape(fallbackColor, x, y, w, h, shape);
             }
         } else {
-            // 角色圖片載入失敗時，用綠色方塊代替
             drawShape(fallbackColor, x, y, w, h, shape);
         }
     }
@@ -338,8 +330,8 @@
         isDefending: false, defenseTimer: 0, charge: 0, maxCharge: 20,
         isStunned: false, stunTimer: 0,
         defenseDuration: 0, guardHitCount: 0,
-        // 大絕攻擊狀態 (總動畫時間為 30 幀) 
-        isUltAttacking: false, ultAttackTimer: 0 
+        isUltAttacking: false, ultAttackTimer: 0,
+        isForcedMoving: false // 新增：用於轉場時的強制走動動畫
     };
 
     const PLAYER_MIN_Y = 200; 
@@ -404,12 +396,11 @@
                 handleFireRelease();
             }
         };
-        // 確保觸控和滑鼠事件都被綁定
         btn.addEventListener('touchstart', handleStart);
         btn.addEventListener('touchend', handleEnd);
         btn.addEventListener('mousedown', handleStart);
         btn.addEventListener('mouseup', handleEnd);
-        btn.addEventListener('touchcancel', handleEnd); // 增加 touchcancel 處理
+        btn.addEventListener('touchcancel', handleEnd); 
     });
 
     function handleFirePress() {
@@ -477,6 +468,7 @@
         // 鎖定主角狀態
         player.isDefending = false;
         player.isAttacking = false;
+        player.isStunned = false; // 清除暈眩狀態 (如果有的話)
 
         bullets.push({
             x: player.x + player.width, 
@@ -565,6 +557,13 @@
         } else {
             player.isInvincible = true;
             player.invincibleTimer = 90; 
+            
+            // 修正 1. 魔王大招擊中時強制暈眩
+            if (options.isUltimate) {
+                player.isStunned = true;
+                player.stunTimer = 60; 
+                showCombatText("暈眩!", player.x + player.width/2, player.y - 40, "yellow");
+            }
         }
     }
 
@@ -671,12 +670,14 @@
     function triggerBossStage() {
         bossActive = true;
         bossSpawned = false;
+        player.isForcedMoving = true; // 修正 2. 開始轉場，強制走動
         updateUI();
     }
 
     function realSpawnBoss() {
         bossActive = true; 
         bossSpawned = true;
+        player.isForcedMoving = false; // 轉場結束，停止強制走動
         
         bossWarningEl.style.display = 'block';
         setTimeout(() => bossWarningEl.style.display = 'none', 3000);
@@ -709,10 +710,10 @@
             if (player.isUltAttacking) {
                 player.ultAttackTimer--;
                 
-                // 大絕招動畫期間，鎖定移動和攻擊狀態
                 keys['ArrowUp'] = keys['ArrowDown'] = keys['ArrowLeft'] = keys['ArrowRight'] = false;
                 player.isAttacking = false;
                 player.isDefending = false;
+                player.isForcedMoving = false; // 大招期間不強制走動
 
                 if (player.ultAttackTimer <= 0) {
                     player.isUltAttacking = false;
@@ -729,7 +730,8 @@
                 player.stunTimer--;
                 player.isDefending = false; 
                 player.isAttacking = false; 
-                if (player.stunTimer <= 0) { // 暈眩 END
+                player.isForcedMoving = false; // 暈眩期間不強制走動
+                if (player.stunTimer <= 0) { 
                     player.isStunned = false;
                     player.guardHitCount = 0; 
                     fireKeyTimer = 0;
@@ -737,7 +739,7 @@
                     keys['Space'] = false; 
                     document.getElementById('btn-fire').classList.remove('pressed'); 
                 }
-            } else if (!player.isUltAttacking) { // 只有在非暈眩且非大絕招動畫時才能執行這些動作
+            } else if (!player.isUltAttacking && !player.isForcedMoving) { // 只有在非暈眩、非大絕招且非強制移動時才能執行這些動作
                 if (fireKeyPressed) {
                     fireKeyTimer++;
                     if (fireKeyTimer >= 15) { 
@@ -758,7 +760,7 @@
                 if (keys['ArrowRight'] && player.x < canvas.width - player.width) player.x += player.speed;
             }
 
-            // 背景捲動邏輯 (修正：防止背景無限放大)
+            // 修正 2. 處理轉場邏輯
             if (bossActive && !bossSpawned) {
                 if (backgroundOffsetX > targetBackgroundOffsetX) {
                     backgroundOffsetX -= backgroundScrollSpeed;
@@ -766,8 +768,10 @@
                     backgroundOffsetX = targetBackgroundOffsetX;
                     realSpawnBoss();
                 }
+                player.isForcedMoving = true; // 強制走動動畫持續
             } else if (!bossActive) {
                 backgroundOffsetX = 0;
+                player.isForcedMoving = false;
             }
 
             player.y = Math.min(Math.max(player.y, PLAYER_MIN_Y), PLAYER_MAX_Y);
@@ -844,6 +848,7 @@
                     
                     let isUltimateHit = b.type === 'ultimate';
 
+                    // 修正 1. 傳入 isUltimate 參數
                     playerTakeDamage(1, {isUltimate: isUltimateHit}); 
                     
                     bossBullets.splice(i, 1); 
@@ -1026,12 +1031,10 @@
     function draw() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
-        // --- 繪製背景 (修正：確保背景圖片能夠在畫布內正確顯示和捲動) ---
+        // 繪製背景
         if (imageLoaded['background']) {
             try {
-                // 畫布寬度 800，圖片寬度 1600。
-                // 來源圖片寬高 1600x500，繪製目標寬高 1600x500
-                // 這樣 backgroundOffsetX 才能控制捲動。
+                // 圖片寬度 1600x500
                 ctx.drawImage(images['background'], backgroundOffsetX, 0, 1600, 500);
             } catch(e) {
                 drawFallbackBackground();
@@ -1039,8 +1042,8 @@
         } else {
             drawFallbackBackground();
         }
-        // -----------------------------------------------------------------
-
+        
+        // 繪製 Boss Text
         if (bossText.timer > 0) {
             ctx.font = "bold 24px Arial";
             ctx.fillStyle = "white"; ctx.strokeStyle = "black"; ctx.lineWidth = 3; ctx.textAlign = "center";
@@ -1052,23 +1055,22 @@
             let isMoving = keys['ArrowUp'] || keys['ArrowDown'] || keys['ArrowLeft'] || keys['ArrowRight'];
             let bodyImgKey;
 
-            // === 繪製主角圖片邏輯 (大絕招交替與停格邏輯) ===
+            // === 繪製主角圖片邏輯 (包含大絕招與轉場走動動畫) ===
             if (player.isUltAttacking) {
-                if (player.ultAttackTimer > 25) { // 30 -> 26 (約 5 幀: ba1.png)
+                if (player.ultAttackTimer > 25) { 
                     bodyImgKey = 'playerUltAttack1'; 
-                } else { // 25 -> 1 (約 25 幀: ba2.png, 停格)
+                } else { 
                     bodyImgKey = 'playerUltAttack2';
                 }
+            } else if (player.isForcedMoving || isMoving) { // 修正 2. 強制移動或玩家輸入移動
+                bodyImgKey = (Math.floor(frameCount / 8) % 2 === 0) ? 'playerRun1' : 'playerRun2';
             } else if (player.isAttacking) {
                 bodyImgKey = 'playerAttack';
-            } else if (isMoving) {
-                bodyImgKey = (Math.floor(frameCount / 8) % 2 === 0) ? 'playerRun1' : 'playerRun2';
             } else {
                 bodyImgKey = 'playerRun1';
             }
             // ===========================================
 
-            // 修正：確保角色圖能顯示，即使圖片下載失敗，也會顯示綠色方塊
             drawSprite(bodyImgKey, player.x, player.y, player.width, player.height, '#32CD32'); 
 
             if (player.isDefending) {
@@ -1111,7 +1113,6 @@
             if (b.type === 'super') {
                 drawSprite('superMove', b.x, b.y, b.width, b.height, '#00FFFF', 'rect');
             } else {
-                // 確保子彈顯示
                 drawSprite('playerBullet', b.x - b.size/2, b.y - b.size/2, b.size, b.size, '#FFFF00', 'circle');
             }
         }
@@ -1122,7 +1123,7 @@
                 drawSprite('bossUltBullet', -b.size/2, -b.size/2, b.size, b.size, '#8B0000');
                 ctx.restore();
             } else {
-                drawSprite('minion', b.x - b.size/2, b.y - b.size/2, b.size, b.size, '#A52A2A');
+                drawSprite('minion', b.x - b.size/2, b.y - b.size/2, b.size, b.size, '#A52A5A');
             }
         }
         
