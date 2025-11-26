@@ -359,19 +359,25 @@
     let lastFireReleaseTime = 0;
 
     window.addEventListener('keydown', (e) => {
-        // 轉場期間或角色被鎖定，不接受任何輸入
-        if (player.isForcedMoving || player.isStunned || player.isUltAttacking) return;
+        // 轉場時，只允許移動控制，鎖定攻擊/防禦 (Space)
+        if (player.isForcedMoving && e.code === 'Space') return;
+        // 角色被鎖定，不接受任何輸入
+        if (player.isStunned || player.isUltAttacking) return;
+
 
         keys[e.code] = true;
         if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code)) e.preventDefault();
+        
         if (e.code === 'Space' && !fireKeyPressed) {
             fireKeyPressed = true;
             handleFirePress();
         }
     });
     window.addEventListener('keyup', (e) => {
-        // 轉場期間或角色被鎖定，不接受任何輸入
-        if (player.isForcedMoving || player.isStunned || player.isUltAttacking) return;
+        // 轉場時，只允許移動控制，鎖定攻擊/防禦 (Space)
+        if (player.isForcedMoving && e.code === 'Space') return;
+        // 角色被鎖定，不接受任何輸入
+        if (player.isStunned || player.isUltAttacking) return;
         
         keys[e.code] = false;
         if (e.code === 'Space') {
@@ -386,9 +392,13 @@
             e.preventDefault();
             const key = btn.getAttribute('data-key');
 
-            // 轉場期間或角色被鎖定，不接受任何輸入
-            if (player.isForcedMoving || player.isStunned || player.isUltAttacking) {
-                // 但要確保按鈕視覺效果被移除
+            // 轉場時鎖定攻擊按鈕
+            if (player.isForcedMoving && key === 'Space') {
+                btn.classList.remove('pressed'); 
+                return;
+            }
+            // 角色被鎖定，不接受任何輸入
+            if (player.isStunned || player.isUltAttacking) {
                 btn.classList.remove('pressed'); 
                 return;
             }
@@ -404,8 +414,13 @@
             e.preventDefault();
             const key = btn.getAttribute('data-key');
             
-            // 轉場期間或角色被鎖定，不處理釋放事件導致的射擊/防禦解除
-            if (player.isForcedMoving || player.isStunned || player.isUltAttacking) {
+            // 轉場時鎖定攻擊按鈕
+            if (player.isForcedMoving && key === 'Space') {
+                 btn.classList.remove('pressed'); 
+                 return;
+            }
+            // 角色被鎖定，不處理釋放事件
+            if (player.isStunned || player.isUltAttacking) {
                  btn.classList.remove('pressed'); 
                  return;
             }
@@ -425,6 +440,7 @@
     });
 
     function handleFirePress() {
+        // 轉場時鎖定攻擊
         if (player.isStunned || !gameRunning || player.isUltAttacking || player.isForcedMoving) return; 
 
         fireKeyTimer = 0;
@@ -439,6 +455,7 @@
     }
 
     function handleFireRelease() {
+        // 轉場時鎖定攻擊
         if (player.isStunned || !gameRunning || player.isUltAttacking || player.isForcedMoving) { 
             player.isDefending = false;
             fireKeyTimer = 0;
@@ -602,7 +619,6 @@
 
     function bossAttack(boss) {
         
-        // 修正 3. 魔王延遲計時器
         if (boss.attackDelayTimer > 0) {
             boss.attackDelayTimer--;
             return; 
@@ -695,9 +711,8 @@
     function triggerBossStage() {
         bossActive = true;
         bossSpawned = false;
-        player.isForcedMoving = true; // 修正 2. 開始轉場，強制走動
-        // 清除所有玩家控制狀態
-        keys['ArrowUp'] = keys['ArrowDown'] = keys['ArrowLeft'] = keys['ArrowRight'] = false;
+        player.isForcedMoving = true; 
+        // 轉場時，只鎖定攻擊和防禦狀態
         player.isAttacking = false;
         player.isDefending = false;
         
@@ -707,7 +722,7 @@
     function realSpawnBoss() {
         bossActive = true; 
         bossSpawned = true;
-        player.isForcedMoving = false; // 修正 2. 轉場結束，停止強制走動
+        player.isForcedMoving = false; // 轉場結束，停止強制走動並解除控制鎖定
         
         bossWarningEl.style.display = 'block';
         setTimeout(() => bossWarningEl.style.display = 'none', 3000);
@@ -719,7 +734,7 @@
             speed: 2, hp: 100, maxHp: 100,
             type: 'boss', phase: 1, moveDir: -1, hasUlted: false,
             isCasting: false,
-            attackDelayTimer: 60 // 修正 3. 新增魔王攻擊延遲
+            attackDelayTimer: 60 
         });
         updateUI();
     }
@@ -741,6 +756,7 @@
             if (player.isUltAttacking) {
                 player.ultAttackTimer--;
                 
+                // 大招期間鎖定所有控制
                 keys['ArrowUp'] = keys['ArrowDown'] = keys['ArrowLeft'] = keys['ArrowRight'] = false;
                 player.isAttacking = false;
                 player.isDefending = false;
@@ -762,6 +778,10 @@
                 player.isDefending = false; 
                 player.isAttacking = false; 
                 player.isForcedMoving = false; 
+                
+                // 暈眩期間也解除移動輸入
+                keys['ArrowUp'] = keys['ArrowDown'] = keys['ArrowLeft'] = keys['ArrowRight'] = false;
+                
                 if (player.stunTimer <= 0) { 
                     player.isStunned = false;
                     player.guardHitCount = 0; 
@@ -770,8 +790,10 @@
                     keys['Space'] = false; 
                     document.getElementById('btn-fire').classList.remove('pressed'); 
                 }
-            } else if (!player.isUltAttacking && !player.isForcedMoving) { 
-                // 只有在非鎖定狀態下，才能處理輸入
+            } 
+
+            // 處理攻擊/防禦狀態 (只在非鎖定狀態下處理)
+            if (!player.isStunned && !player.isUltAttacking && !player.isForcedMoving) {
                 if (fireKeyPressed) {
                     fireKeyTimer++;
                     if (fireKeyTimer >= 15) { 
@@ -784,13 +806,18 @@
                     player.attackTimer--;
                     if (player.attackTimer <= 0) player.isAttacking = false;
                 }
-
-                // 移動控制
+            }
+            
+            // === 修正 1. 移動控制邏輯 (轉場時允許移動) ===
+            // 只要不是暈眩或大招狀態，就可以處理移動輸入
+            if (!player.isStunned && !player.isUltAttacking) {
                 if (keys['ArrowUp']) player.y -= player.speed;
                 if (keys['ArrowDown']) player.y += player.speed;
+                // 轉場時，主角會被背景拉著往右移動，所以水平移動輸入應該是微調 (可選，這裡先保持全速移動)
                 if (keys['ArrowLeft'] && player.x > 0) player.x -= player.speed;
                 if (keys['ArrowRight'] && player.x < canvas.width - player.width) player.x += player.speed;
             }
+            // ============================================
 
             // 轉場邏輯
             if (bossActive && !bossSpawned) {
@@ -816,7 +843,7 @@
             
             if (bossText.timer > 0) bossText.timer--;
             
-            // 修正 1. 擊退所有敵人後才轉場
+            // 擊退所有敵人後才轉場
             if (pendingLevelUp) { 
                 if (enemies.length === 0) {
                     performLevelUp(); 
@@ -993,7 +1020,7 @@
                     }
                 }
                 
-                // 處理小怪消失在畫面左側 (計入已擊退數量，確保清場後轉場)
+                // 處理小怪消失在畫面左側
                 if (enemies[i] && enemies[i].x + enemies[i].width < 0) {
                      if (enemies[i].type !== 'boss') {
                         enemiesDefeatedInLevel++;
@@ -1106,10 +1133,11 @@
         }
 
         if (!player.isInvincible || Math.floor(frameCount / 5) % 2 === 0) {
+            
+            // 轉場時 player.isForcedMoving 為 true, 確保有走動動畫
             let isMoving = keys['ArrowUp'] || keys['ArrowDown'] || keys['ArrowLeft'] || keys['ArrowRight'];
             let bodyImgKey;
 
-            // 修正 2. 強制移動或玩家輸入移動
             if (player.isUltAttacking) {
                 if (player.ultAttackTimer > 25) { 
                     bodyImgKey = 'playerUltAttack1'; 
