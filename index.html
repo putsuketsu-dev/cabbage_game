@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>小高麗：戰鬥完全進化版</title>
     <style>
-        /* (Style unchanged) */
         body {
             margin: 0;
             padding: 0;
@@ -15,8 +14,8 @@
             align-items: center;
             height: 100vh;
             font-family: 'Microsoft JhengHei', sans-serif;
-            overflow: auto; 
-            touch-action: auto; 
+            overflow: hidden; 
+            touch-action: none; 
             user-select: none; 
         }
         #gameContainer {
@@ -269,10 +268,8 @@
         def3: BASE_URL + 'd3.png',
         def4: BASE_URL + 'd4.png',
         def5: BASE_URL + 'd5.png',
-        // === 載入大絕動畫所需圖片 ===
         playerUltAttack1: BASE_URL + 'ba1.png', 
         playerUltAttack2: BASE_URL + 'ba2.png' 
-        // ============================
     };
 
     const images = {};
@@ -340,9 +337,7 @@
         isDefending: false, defenseTimer: 0, charge: 0, maxCharge: 20,
         isStunned: false, stunTimer: 0,
         defenseDuration: 0, guardHitCount: 0,
-        // === 主角大絕攻擊狀態 (總動畫時間為 30 幀) ===
         isUltAttacking: false, ultAttackTimer: 0 
-        // ============================
     };
 
     const PLAYER_MIN_Y = 200; 
@@ -414,12 +409,10 @@
     });
 
     function handleFirePress() {
-        // 大絕招動畫期間不能普攻或防禦
         if (player.isStunned || !gameRunning || player.isUltAttacking) return; 
 
         fireKeyTimer = 0;
         let currentTime = new Date().getTime();
-        // 雙擊判定
         if (currentTime - lastFireReleaseTime < 300 && player.charge >= player.maxCharge) {
             fireSuperMove(); 
             player.isDefending = false; 
@@ -429,7 +422,6 @@
     }
 
     function handleFireRelease() {
-        // 大絕招動畫期間不能普攻或防禦
         if (player.isStunned || !gameRunning || player.isUltAttacking) { 
             player.isDefending = false;
             fireKeyTimer = 0;
@@ -439,13 +431,11 @@
 
         lastFireReleaseTime = new Date().getTime();
         if (fireKeyTimer < 15) { 
-            // 短按：普通攻擊
             shoot(); 
             player.isAttacking = true;
             player.attackTimer = 15;
         }
         
-        // 釋放按鍵，防禦解除
         player.isDefending = false;
         fireKeyTimer = 0;
         player.guardHitCount = 0; 
@@ -473,14 +463,11 @@
         updateChargeUI(); 
         showSkillText("小高麗的制裁！", player.x, player.y - 50);
         
-        // === 啟用主角大絕攻擊狀態 (總動畫時間設定為 30 幀) ===
         player.isUltAttacking = true;
         player.ultAttackTimer = 30; 
         
-        // 鎖定主角狀態
         player.isDefending = false;
         player.isAttacking = false;
-        // ===========================================
 
         bullets.push({
             x: player.x + player.width, 
@@ -512,7 +499,6 @@
     }
 
     function shoot() {
-        // 確保大絕招動畫播放時無法普攻
         if(player.isDefending || player.isUltAttacking) return; 
 
         let bulletCount = 1;
@@ -543,17 +529,15 @@
 
     function playerTakeDamage(damage, options = {}) {
         if (player.isDefending) {
-            
             let hitCount = options.isUltimate ? 3 : 1; 
-            
             player.guardHitCount += hitCount;
             
-            if (player.guardHitCount >= 5) { // Defense Break Trigger (破防)
+            if (player.guardHitCount >= 5) { 
                 player.isDefending = false;
                 player.isStunned = true;
-                player.stunTimer = 60; // Stun duration
+                player.stunTimer = 60; 
                 player.hp -= 1; 
-                player.guardHitCount = 0; // Reset guardHitCount on break
+                player.guardHitCount = 0; 
                 updateHPUI();
                 showCombatText("破防!!", player.x + player.width/2, player.y - 20, "red");
             } else {
@@ -563,6 +547,16 @@
         }
 
         if (player.isInvincible || !gameRunning) return;
+
+        // === [修正1] 暈眩判斷邏輯 ===
+        // 如果沒有防禦，且被魔王大絕擊中
+        if (options.isUltimate) {
+            player.isStunned = true;
+            player.stunTimer = 60; // 暈眩 1 秒 (60 幀)
+            showCombatText("暈眩!", player.x + player.width/2, player.y - 20, "orange");
+        }
+        // =========================
+
         player.hp -= damage;
         updateHPUI();
         if (player.hp <= 0) {
@@ -656,7 +650,6 @@
 
             let spawnY = ENEMY_SPAWN_MIN_Y + Math.random() * yRange;
             
-            // === 速度漸進式提升 ===
             let speedMultiplier = 1.0;
             if (frameCount < 300) speedMultiplier = 0.4;
             else if (frameCount < 900) speedMultiplier = 0.7;
@@ -711,11 +704,8 @@
     function update() {
         if (gameRunning) {
             
-            // === 處理大絕招動畫計時器及鎖定狀態 ===
             if (player.isUltAttacking) {
                 player.ultAttackTimer--;
-                
-                // 大絕招動畫期間，鎖定移動和攻擊狀態
                 keys['ArrowUp'] = keys['ArrowDown'] = keys['ArrowLeft'] = keys['ArrowRight'] = false;
                 player.isAttacking = false;
                 player.isDefending = false;
@@ -724,7 +714,6 @@
                     player.isUltAttacking = false;
                 }
             }
-            // ===================================
 
             if (player.isDefending) {
                 player.defenseDuration++;
@@ -736,7 +725,7 @@
                 player.stunTimer--;
                 player.isDefending = false; 
                 player.isAttacking = false; 
-                if (player.stunTimer <= 0) { // 暈眩 END
+                if (player.stunTimer <= 0) { 
                     player.isStunned = false;
                     player.guardHitCount = 0; 
                     fireKeyTimer = 0;
@@ -744,7 +733,7 @@
                     keys['Space'] = false; 
                     document.getElementById('btn-fire').classList.remove('pressed'); 
                 }
-            } else if (!player.isUltAttacking) { // 只有在非暈眩且非大絕招動畫時才能執行這些動作
+            } else if (!player.isUltAttacking) { 
                 if (fireKeyPressed) {
                     fireKeyTimer++;
                     if (fireKeyTimer >= 15) { 
@@ -880,16 +869,15 @@
                             e.x -= 0.5;
                         } else if (e.jumpTimer < 80) { 
                             e.x -= e.speed * 3; 
-                            if (e.jumpTimer === 60) { // 在進入衝刺時重設跳躍
-                                e.vy = (Math.random() - 0.5) * 12; 
+                            if (e.jumpTimer === 60) { 
+                                e.vy = (Math.random() - 0.5) * 4; 
                             }
                             e.y += e.vy;
-                            e.y = Math.min(Math.max(e.y, 150), 350);
                         } else {
                             e.jumpTimer = 0;
                         }
                     } else {
-                        e.x -= e.speed; 
+                        e.x -= e.speed;
                     }
                 }
 
@@ -897,54 +885,53 @@
                     let b = bullets[j];
                     
                     let bRect = b.type === 'super' 
-                        ? {x: b.x, y: b.y, width: b.width, height: b.height}
-                        : {x: b.x - (b.size * 0.8)/2, y: b.y - (b.size * 0.8)/2, width: b.size * 0.8, height: b.size * 0.8};
+                        ? {x: b.x, y: b.y, width: b.width, height: b.height} 
+                        : {x: b.x - b.size/2 + b.size*0.1, y: b.y - b.size/2 + b.size*0.1, width: b.size * 0.8, height: b.size * 0.8}; 
 
-                    if (checkRectCollision(bRect, {x: e.x + 10, y: e.y + 10, width: e.width - 20, height: e.height - 20})) {
+                    let eRect = {x: e.x + 10, y: e.y + 10, width: e.width - 20, height: e.height - 20};
+
+                    if (checkRectCollision(bRect, eRect)) {
                         
-                        let defenseChance = 0.3; 
-                        if (b.type === 'super') {
-                            defenseChance = 0.6; 
-                        }
-
+                        let defenseChance = (e.type === 'boss' && b.type === 'super') ? 0.6 : 0.3; 
+                        
                         if (e.type === 'boss' && Math.random() < defenseChance) {
                             showCombatText("防禦!", e.x + e.width/2, e.y, "#00FFFF");
                             if (!b.piercing) bullets.splice(j, 1);
                         } else {
                             e.hp -= (b.damage || 1);
-                            if (e.type === 'boss') { addCharge(); chargeDirty = true; } 
+                            if (e.type === 'boss') { addCharge(); chargeDirty = true; }
                             if (!b.piercing) bullets.splice(j, 1);
 
                             if (e.hp <= 0) {
                                 if (e.type === 'boss') {
-                                    if (e.phase === 1) {
-                                        evolveBoss(e); 
-                                        uiDirty = true;
-                                        bullets.splice(j, 1); 
-                                        break; 
-                                    } else { 
-                                        gameWin();
-                                        break; 
-                                    }
+                                    if (e.phase === 1) evolveBoss(e); else gameWin();
                                 } else {
-                                    addCharge();
-                                    chargeDirty = true;
+                                    addCharge(); chargeDirty = true;
                                     if (e.type === 'smallBoss') {
-                                        if (Math.random() < 0.5) { 
-                                            let itemType = Math.random() < 0.3 ? 'blackHeart' : 'heart';
-                                            spawnItem(e.x, e.y, itemType);
+                                        if (Math.random() < 0.5) {
+                                            items.push({
+                                                x: e.x, y: e.y, width: 40, height: 40, speed: 2, type: 'heart'
+                                            });
+                                        } else if (Math.random() < 0.1) { 
+                                            items.push({
+                                                x: e.x, y: e.y, width: 40, height: 40, speed: 2, type: 'blackHeart'
+                                            });
                                         }
                                     }
                                     score += 10; enemiesDefeatedInLevel++;
                                     if (enemiesDefeatedInLevel >= ENEMIES_PER_LEVEL) pendingLevelUp = true;
                                     enemies.splice(i, 1);
+                                    uiDirty = true;
+                                    
+                                    break; 
                                 }
-                                uiDirty = true; 
+                                uiDirty = true;
                             }
                         }
-                        if (!b.piercing) break;
+                        if (!b.piercing) break; 
                     }
                 }
+                
                 if (gameRunning && enemies[i]) {
                     if (checkRectCollision(
                         {x: e.x + 10, y: e.y + 10, width: e.width - 20, height: e.height - 20},
@@ -952,6 +939,7 @@
                     )) {
                         playerTakeDamage(1);
                         if(e.type !== 'boss') enemies.splice(i, 1);
+                        uiDirty = true;
                     }
                 }
                 if (enemies[i] && enemies[i].x + enemies[i].width < 0) enemies.splice(i, 1);
@@ -961,11 +949,8 @@
             if (chargeDirty) updateChargeUI();
 
             frameCount++;
-        } // end if gameRunning
-
-        // 繪圖持續進行，這樣開始畫面才有背景
-        draw();
-        requestAnimationFrame(update);
+        }
+        requestAnimationFrame(draw);
     }
     
     function checkRectCollision(rect1, rect2) {
@@ -974,17 +959,17 @@
                rect1.y < rect2.y + rect2.height &&
                rect1.y + rect1.height > rect2.y;
     }
-    function performLevelUp() { level++; enemiesDefeatedInLevel = 0; if (level === 3) triggerBossStage(); updateUI(); }
-    
-    function spawnItem(x, y, type = 'heart') {
-        // 物品掉落在腳邊
-        let dropY = Math.min(Math.max(y + (Math.random() * 60 - 30), 250), 380);
+
+    function performLevelUp() { 
+        level++; 
+        enemiesDefeatedInLevel = 0; 
         
-        items.push({
-            x: x, y: dropY,
-            width: 50, height: 50,
-            type: type, speed: 2
-        });
+        if (level === 3) {
+            triggerBossStage();
+        } else if (level > 3) {
+            if (player.hp < player.maxHp) player.hp++; updateHPUI(); 
+        }
+        updateUI(); 
     }
 
     function updateUI() {
@@ -997,46 +982,23 @@
         } else { levelEl.innerText = level; nextLevelEl.innerText = "還需: " + (ENEMIES_PER_LEVEL - enemiesDefeatedInLevel); }
     }
 
-    // --- 遊戲狀態控制 ---
-    
-    startScreen.style.display = 'flex';
-
-    function startGame() {
-        gameStarted = true;
-        gameRunning = true;
-        startScreen.style.display = 'none';
-        frameCount = 0; 
-    }
-
-    function gameWin() {
-        gameRunning = false;
-        document.getElementById('endTitle').innerText = "恭喜通關!";
-        finalScoreEl.innerText = score;
-        gameOverScreen.style.display = 'block';
-    }
-
-    function gameOver(reason) {
-        gameRunning = false;
-        document.getElementById('endTitle').innerText = "遊戲結束";
-        finalScoreEl.innerText = score;
-        let p = document.createElement('p'); p.innerText = reason; p.style.color='red';
-        // 移除舊的失敗原因，避免重複添加
-        const oldReason = gameOverScreen.querySelector('p[style*="color: red"]');
-        if (oldReason) oldReason.remove(); 
-        gameOverScreen.insertBefore(p, gameOverScreen.children[2]);
-        gameOverScreen.style.display = 'block';
-    }
-    
-    function restartGame() {
-        location.reload();
-    }
-
     function draw() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
+        // 繪製背景 (1600x500 原圖，平移繪製)
         if (imageLoaded['background']) {
             try {
-                ctx.drawImage(images['background'], backgroundOffsetX, 0, 1600, 500);
+                ctx.drawImage(
+                    images['background'], 
+                    -backgroundOffsetX, 
+                    0, 
+                    canvas.width, 
+                    canvas.height,
+                    0, 
+                    0, 
+                    canvas.width, 
+                    canvas.height
+                );
             } catch(e) {
                 drawFallbackBackground();
             }
@@ -1051,64 +1013,59 @@
             ctx.fillText(bossText.text, bossText.x + 90, bossText.y);
         }
 
+        // 玩家
         if (!player.isInvincible || Math.floor(frameCount / 5) % 2 === 0) {
-            let isMoving = keys['ArrowUp'] || keys['ArrowDown'] || keys['ArrowLeft'] || keys['ArrowRight'];
-            let bodyImgKey;
-
-            // === 繪製主角圖片邏輯更新 (大絕招交替與停格邏輯) ===
+            let imgKey;
+            
             if (player.isUltAttacking) {
-                if (player.ultAttackTimer > 25) { // 30 -> 26 (5幀, ~0.08秒)
-                    bodyImgKey = 'playerUltAttack1'; 
-                } else { // 25 -> 1 (25幀, ~0.42秒，含您要求的 0.3 秒停格)
-                    bodyImgKey = 'playerUltAttack2';
-                }
+                // 大絕招施放時，切換動作 (前半段用1，後半段用2)
+                imgKey = (player.ultAttackTimer > 15) ? 'playerUltAttack1' : 'playerUltAttack2';
             } else if (player.isAttacking) {
-                bodyImgKey = 'playerAttack';
-            } else if (isMoving) {
-                bodyImgKey = (Math.floor(frameCount / 8) % 2 === 0) ? 'playerRun1' : 'playerRun2';
+                imgKey = 'playerAttack';
+            } else if (player.isMoving || (bossActive && !bossSpawned)) { // [修正2] 加入轉場強制走路邏輯
+                imgKey = (Math.floor(frameCount / 8) % 2 === 0) ? 'playerRun1' : 'playerRun2';
             } else {
-                bodyImgKey = 'playerRun1';
-            }
-            // ===========================================
-
-            drawSprite(bodyImgKey, player.x, player.y, player.width, player.height, '#32CD32'); 
-
-            if (player.isDefending) {
-                let defFrameIndex = Math.floor(player.defenseDuration / 5);
-                if (defFrameIndex > 4) defFrameIndex = 4;
-                let defImgKey = 'def' + (defFrameIndex + 1);
-
-                const scale = 1.4; 
-                const rightOffset = 40; 
-                const tweakOffset = 5; 
-
-                let sW = player.width * scale;
-                let sH = player.height * scale;
-                let sY = player.y + (player.height - sH) / 2;
-                let sX = player.x + rightOffset + tweakOffset;
-
-                drawSprite(defImgKey, sX, sY, sW, sH, null);
+                imgKey = 'playerRun1'; 
             }
 
+            // 暈眩時變灰
             if (player.isStunned) {
-                ctx.font = "40px Arial";
+                ctx.save();
+                ctx.filter = 'grayscale(100%)'; 
+                drawSprite(imgKey, player.x, player.y, player.width, player.height, '#32CD32');
+                ctx.restore();
+                
+                // 畫暈眩符號
+                ctx.font = "30px Arial";
                 ctx.fillStyle = "yellow";
-                ctx.textAlign = "center";
-                ctx.fillText("💫", player.x + player.width/2, player.y);
+                ctx.fillText("💫", player.x + player.width/2 - 15, player.y - 10);
+            } else {
+                drawSprite(imgKey, player.x, player.y, player.width, player.height, '#32CD32');
+            }
+            
+            if (player.isDefending) {
+                let shieldImgKey = 'def1';
+                let duration = player.defenseDuration;
+                // 簡單的防禦動畫循環 (每5幀換一張)
+                let frame = Math.floor(duration / 5) % 5; 
+                if (frame === 0) shieldImgKey = 'def1';
+                else if (frame === 1) shieldImgKey = 'def2';
+                else if (frame === 2) shieldImgKey = 'def3';
+                else if (frame === 3) shieldImgKey = 'def4';
+                else shieldImgKey = 'def5';
+
+                // 繪製防禦盾牌圖片
+                drawSprite(shieldImgKey, player.x - 20, player.y - 20, player.width + 40, player.height + 40, 'rgba(0,0,0,0)');
             }
         }
         
         for (let item of items) {
             ctx.font = "40px Arial"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-            if (item.type === 'blackHeart') {
-                ctx.fillStyle = "black";
-                ctx.fillText("🖤", item.x + item.width/2, item.y + item.height/2);
-            } else {
-                ctx.fillStyle = "red";
-                ctx.fillText("❤️", item.x + item.width/2, item.y + item.height/2);
-            }
+            let icon = item.type === 'blackHeart' ? "🖤" : "❤️";
+            ctx.fillText(icon, item.x + item.width/2, item.y + item.height/2);
         }
 
+        // 子彈
         for (let b of bullets) {
             if (b.type === 'super') {
                 drawSprite('superMove', b.x, b.y, b.width, b.height, '#00FFFF', 'rect');
@@ -1117,6 +1074,7 @@
             }
         }
         
+        // 魔王子彈
         for (let b of bossBullets) {
             if (b.type === 'ultimate') {
                 ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.rotation);
@@ -1127,6 +1085,7 @@
             }
         }
         
+        // 敵人
         for (let e of enemies) {
             if (e.type === 'boss') {
                 let shake = (e.phase === 2) ? (Math.random() * 6 - 3) : 0;
@@ -1162,52 +1121,71 @@
     }
 
     function drawFallbackBackground() {
-        ctx.fillStyle = '#87CEEB';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = '#228B22';
-        ctx.fillRect(0, 450, canvas.width, 50);
-    }
-
-    function toggleFullscreen() {
-        const element = document.getElementById('gameContainer'); 
-        
-        const isFullscreen = document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement;
-
-        if (isFullscreen) {
-            if (document.exitFullscreen) document.exitFullscreen();
-            else if (document.mozCancelFullScreen) document.mozCancelFullScreen();
-            else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
-            else if (document.msExitFullscreen) document.msExitFullscreen();
-        } else {
-            if (element.requestFullscreen) {
-                element.requestFullscreen().catch(err => console.error("Fullscreen request blocked/failed:", err));
-            } else if (element.mozRequestFullScreen) { 
-                element.mozRequestFullScreen();
-            } else if (element.webkitRequestFullscreen) { 
-                element.webkitRequestFullscreen();
-            } else if (element.msRequestFullscreen) { 
-                element.msRequestFullscreen();
-            }
+        ctx.fillStyle = '#87CEEB'; 
+        ctx.fillRect(0,0,canvas.width, canvas.height);
+        ctx.strokeStyle = "rgba(255,255,255,0.3)";
+        ctx.lineWidth = 2;
+        let offset = backgroundOffsetX % 100; 
+        for(let i=offset; i<canvas.width; i+=100) {
+            ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke();
         }
     }
 
-    function handleFullscreenChange() {
-        const isFullscreen = document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement;
-        fullscreenBtn.innerText = isFullscreen ? '[退出全螢幕]' : '[全螢幕模式]';
+    function startGame() {
+        startScreen.style.display = 'none';
+        uiEl.style.display = 'block';
+        controlsEl.style.display = 'flex';
+        gameRunning = true;
+        gameStarted = true;
+        updateUI();
+        updateChargeUI();
+        setInterval(() => {
+            if(gameRunning) requestAnimationFrame(update);
+        }, 1000/60); 
     }
 
-    fullscreenBtn.addEventListener('click', toggleFullscreen);
+    function gameOver(reason) {
+        gameRunning = false; endTitle.innerText = reason; finalScoreEl.innerText = score;
+        gameOverScreen.style.display = 'block';
+    }
+    function gameWin() {
+        gameRunning = false; endTitle.innerText = "🏆 傳奇誕生！"; finalScoreEl.innerText = score + 10000;
+        gameOverScreen.style.display = 'block';
+    }
+    function restartGame() {
+        score = 0; level = 1; enemiesDefeatedInLevel = 0; bossActive = false; pendingLevelUp = false; bossSpawned = false;
+        enemies = []; bullets = []; bossBullets = []; items = []; combatTexts = [];
+        player.y = 250; player.x = 50; player.hp = player.maxHp; player.isInvincible = false;
+        player.isAttacking = false; player.isDefending = false; player.attackTimer = 0; player.charge = 0;
+        player.isStunned = false; player.guardHitCount = 0;
+        enemySpawnRate = 60; 
+        backgroundOffsetX = 0; 
+        gameRunning = true; gameOverScreen.style.display = 'none'; bossWarningEl.style.display = 'none';
+        skillContainer.innerHTML = ''; updateUI(); updateChargeUI(); 
+    }
+    
+    // Fullscreen toggle logic
+    fullscreenBtn.addEventListener('click', () => {
+        const elem = document.getElementById('gameContainer');
+        if (!document.fullscreenElement) {
+            if (elem.requestFullscreen) {
+                elem.requestFullscreen();
+            } else if (elem.webkitRequestFullscreen) { 
+                elem.webkitRequestFullscreen();
+            }
+        } else {
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            }
+        }
+    });
 
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
-    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
-    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
-    
-    // 初始化 UI
-    updateUI(); 
-    
-    // 啟動遊戲循環
-    requestAnimationFrame(update);
+    // Initial draw to show something before start
+    drawFallbackBackground();
+    uiEl.style.display = 'none';
+    controlsEl.style.display = 'none';
+    startScreen.style.display = 'flex';
+
 </script>
 
 </body>
